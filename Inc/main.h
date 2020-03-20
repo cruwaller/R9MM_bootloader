@@ -24,51 +24,55 @@
 #define __MAIN_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
+  /* Private includes ----------------------------------------------------------*/
+  /* USER CODE BEGIN Includes */
 
-/* USER CODE END Includes */
+  /* USER CODE END Includes */
 
-/* Exported types ------------------------------------------------------------*/
-/* USER CODE BEGIN ET */
+  /* Exported types ------------------------------------------------------------*/
+  /* USER CODE BEGIN ET */
 
-/* USER CODE END ET */
+  /* USER CODE END ET */
 
-/* Exported constants --------------------------------------------------------*/
-/* USER CODE BEGIN EC */
+  /* Exported constants --------------------------------------------------------*/
+  /* USER CODE BEGIN EC */
 
-/* USER CODE END EC */
+  /* USER CODE END EC */
 
-/* Exported macro ------------------------------------------------------------*/
-/* USER CODE BEGIN EM */
+  /* Exported macro ------------------------------------------------------------*/
+  /* USER CODE BEGIN EM */
 
-/* USER CODE END EM */
+  /* USER CODE END EM */
 
-/* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
+  /* Exported functions prototypes ---------------------------------------------*/
+  void Error_Handler(void);
+  void led_red_state_set(const GPIO_PinState state);
+  void led_green_state_set(const GPIO_PinState state);
 
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#ifdef BUTTON
 #define BTN_Pin GPIO_PIN_13
 #define BTN_GPIO_Port GPIOC
+#endif /* BUTTON */
+#ifdef LED_GRN
 #define LED_GRN_Pin GPIO_PIN_3
 #define LED_GRN_GPIO_Port GPIOB
+#endif /* LED_GRN */
+#ifdef LED_RED
 #define LED_RED_Pin GPIO_PIN_1
 #define LED_RED_GPIO_Port GPIOC
-/* USER CODE BEGIN Private defines */
-
-#define BLrequest 0x20004FF4;
-
-/* USER CODE END Private defines */
+#endif /* LED_RED */
 
 #ifdef __cplusplus
 }
