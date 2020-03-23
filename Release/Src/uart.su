@@ -1,4 +1,0 @@
-uart.c:18:13:uart_receive	8	static
-uart.c:30:13:uart_receive_timeout	8	static
-uart.c:47:13:uart_transmit_str	8	static
-uart.c:71:13:uart_transmit_ch	16	static

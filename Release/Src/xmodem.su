@@ -1,3 +1,0 @@
-xmodem.c:157:22:xmodem_handle_packet	1064	static
-xmodem.c:247:22:xmodem_error_handler.constprop	8	static
-xmodem.c:33:6:xmodem_receive	32	static
