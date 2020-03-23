@@ -1,4 +1,3 @@
-/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.h
@@ -17,48 +16,37 @@
   *
   ******************************************************************************
   */
-/* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H
 #define __MAIN_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 /* Includes ------------------------------------------------------------------*/
+#include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
 
-  /* Private includes ----------------------------------------------------------*/
-  /* USER CODE BEGIN Includes */
+/* Private includes ----------------------------------------------------------*/
 
-  /* USER CODE END Includes */
+/* Exported types ------------------------------------------------------------*/
 
-  /* Exported types ------------------------------------------------------------*/
-  /* USER CODE BEGIN ET */
+/* Exported constants --------------------------------------------------------*/
 
-  /* USER CODE END ET */
+/* Exported macro ------------------------------------------------------------*/
 
-  /* Exported constants --------------------------------------------------------*/
-  /* USER CODE BEGIN EC */
+enum duplex_state
+{
+  DUPLEX_RX,
+  DUPLEX_TX,
+};
 
-  /* USER CODE END EC */
+/* Exported functions prototypes ---------------------------------------------*/
+void Error_Handler(void);
+void led_red_state_set(const GPIO_PinState state);
+void led_green_state_set(const GPIO_PinState state);
+void duplex_state_set(const enum duplex_state state);
+int8_t timer_end(void);
 
-  /* Exported macro ------------------------------------------------------------*/
-  /* USER CODE BEGIN EM */
-
-  /* USER CODE END EM */
-
-  /* Exported functions prototypes ---------------------------------------------*/
-  void Error_Handler(void);
-  void led_red_state_set(const GPIO_PinState state);
-  void led_green_state_set(const GPIO_PinState state);
-
-/* USER CODE BEGIN EFP */
-
-/* USER CODE END EFP */
+void enable_pclock(uint32_t periph_base);
 
 /* Private defines -----------------------------------------------------------*/
 #ifdef BUTTON
@@ -66,16 +54,27 @@ extern "C"
 #define BTN_GPIO_Port GPIOC
 #endif /* BUTTON */
 #ifdef LED_GRN
+#if TARGET_R9MM
 #define LED_GRN_Pin GPIO_PIN_3
 #define LED_GRN_GPIO_Port GPIOB
+#elif TARGET_R9M
+#define LED_GRN_Pin GPIO_PIN_12
+#define LED_GRN_GPIO_Port GPIOA
+#endif
 #endif /* LED_GRN */
 #ifdef LED_RED
+#if TARGET_R9MM
 #define LED_RED_Pin GPIO_PIN_1
 #define LED_RED_GPIO_Port GPIOC
+#elif TARGET_R9M
+#define LED_RED_Pin GPIO_PIN_11
+#define LED_RED_GPIO_Port GPIOA
+#endif
 #endif /* LED_RED */
 
-#ifdef __cplusplus
-}
+#if TARGET_R9M
+#define DUPLEX_Pin GPIO_PIN_5
+#define DUPLEX_Port GPIOA
 #endif
 
 #endif /* __MAIN_H */

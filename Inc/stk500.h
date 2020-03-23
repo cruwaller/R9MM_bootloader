@@ -10,11 +10,24 @@
 
 #include <stdint.h>
 
+#define STK_PAGE_SIZE 128
+
 #define SIGNATURE_0 0x1E
-#define SIGNATURE_1 0x55 //0x97
-#define SIGNATURE_2 0xAA //0x02
-#define SIGNATURE_3 0x97
-#define SIGNATURE_4 0x02
+#if (STK_PAGE_SIZE == 256)
+/* These are causing:
+    pageSize = 256;
+    writeOffset = 0x1000; // start offset (word address)
+*/
+#define SIGNATURE_1 0x55
+#define SIGNATURE_2 0xAA
+#elif (STK_PAGE_SIZE == 128)
+/* These are causing:
+    pageSize = 128;
+    writeOffset = 0; // start offset (word address)
+*/
+#define SIGNATURE_1 0x97
+#define SIGNATURE_2 0x02
+#endif
 
 /* STK500 constants list, from AVRDUDE */
 #define STK_OK 0x10

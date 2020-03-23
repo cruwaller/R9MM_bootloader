@@ -10,23 +10,29 @@
 #ifndef UART_H_
 #define UART_H_
 
-#include "stm32f1xx_hal.h"
-
-extern UART_HandleTypeDef huart1;
+#include <stdint.h>
 
 /* Timeout for HAL. */
 #define UART_TIMEOUT ((uint16_t)1000u)
 
 /* Status report for the functions. */
-typedef enum {
-  UART_OK     = 0x00u, /**< The action was successful. */
-  UART_ERROR  = 0xFFu  /**< Generic error. */
+typedef enum
+{
+  UART_OK = 0x00u,   /**< The action was successful. */
+  UART_ERROR = 0xFFu /**< Generic error. */
 } uart_status;
 
 uart_status uart_receive(uint8_t *data, uint16_t length);
 uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeout);
 uart_status uart_transmit_str(uint8_t *data);
 uart_status uart_transmit_ch(uint8_t data);
+uart_status uart_transmit_bytes(uint8_t *data, uint32_t len);
 
+void uart_init(void);
+
+#ifdef DEBUG_UART
+void debug_init(void);
+void debug_send(uint8_t data);
+#endif
 
 #endif /* UART_H_ */
