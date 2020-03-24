@@ -33,6 +33,7 @@ typedef enum
 } flash_status;
 
 flash_status flash_erase(uint32_t address);
+flash_status flash_erase_page(uint32_t address);
 flash_status flash_write(uint32_t address, uint32_t *data, uint32_t length);
 flash_status flash_write_halfword(uint32_t address, uint16_t *data,
                                   uint32_t length);

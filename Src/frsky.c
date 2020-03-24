@@ -53,7 +53,7 @@ enum rx_state
 };
 
 static uint_fast8_t flash_ongoing = 0;
-static uint32_t address_offset = FRSKY_HEADER_SIZE;
+static uint32_t address_offset = 0;
 
 /* frame[0..6 = data][7 = crc] */
 uint8_t frame[FRAME_SIZE];
@@ -75,6 +75,11 @@ uint16_t crc16(const uint8_t *data_p, uint8_t length)
 uint8_t *startFrame(const uint8_t command)
 {
     memset(frame, 0, sizeof(frame));
+    //frame[0] = START_STOP;
+    //frame[1] = RX_BYTE;
+    //frame[2] = HEADBYTE;
+    //frame[3] = command;
+    //return &frame[4];
     frame[0] = HEADBYTE;
     frame[1] = command;
     return &frame[2];
@@ -111,9 +116,8 @@ void send_command(const uint8_t command)
     send_frame();
 }
 
-void send_address(const uint8_t start)
+void send_address(void)
 {
-    address_offset = (start) ? FRSKY_HEADER_SIZE : address_offset + 4;
     uint8_t *ptr = startFrame(PRIM_REQ_DATA_ADDR);
     *((uint32_t *)ptr) = address_offset;
     send_frame();
@@ -152,18 +156,31 @@ void process_frame(const uint8_t first)
             break;
         case PRIM_REQ_VERSION:
             send_command(PRIM_ACK_VERSION);
+            flash_ongoing = 1;
             break;
         case PRIM_CMD_DOWNLOAD:
-            flash_ongoing = 1;
             // start upload, give file offset
-            send_address(1);
+            address_offset = 0;
+            send_address();
             break;
         case PRIM_DATA_WORD:
         {
-            uint32_t data = *((uint32_t *)(&frame[2]));
-            //flash_write(FLASH_APP_START_ADDRESS + address_offset, &data, 1);
-            (void)data;
-            send_address(0);
+            /* Check that address is correct */
+            if (frame[6] == (address_offset & 0xff))
+            {
+                if (FRSKY_HEADER_SIZE <= address_offset)
+                {
+                    uint32_t data = *((uint32_t *)(&frame[2]));
+                    uint32_t tgt_addr = FLASH_APP_START_ADDRESS +
+                                        (address_offset - FRSKY_HEADER_SIZE);
+                    if ((tgt_addr & (FLASH_PAGE_SIZE - 1)) == 0)
+                        flash_erase_page(tgt_addr);
+                    if (flash_write(tgt_addr, &data, 1) != FLASH_OK)
+                        return;
+                }
+                address_offset += 4;
+                send_address();
+            }
             break;
         }
         case PRIM_DATA_EOF:
@@ -235,8 +252,6 @@ int8_t frsky_check(void)
 {
     uint8_t led_state = 1, gled = 1;
     uint8_t data;
-
-    uart_transmit_ch(0x7E);
 
     while (1)
     {

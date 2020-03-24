@@ -21,8 +21,6 @@ typedef void (*fnc_ptr)(void);
  */
 flash_status flash_erase(uint32_t address)
 {
-  HAL_FLASH_Unlock();
-
   flash_status status = FLASH_ERROR;
   FLASH_EraseInitTypeDef erase_init;
   uint32_t error = 0u;
@@ -33,11 +31,38 @@ flash_status flash_erase(uint32_t address)
   /* Calculate the number of pages from "address" and the end of flash. */
   erase_init.NbPages = (FLASH_BANK1_END - address) / FLASH_PAGE_SIZE;
   /* Do the actual erasing. */
+  HAL_FLASH_Unlock();
   if (HAL_OK == HAL_FLASHEx_Erase(&erase_init, &error))
   {
     status = FLASH_OK;
   }
+  HAL_FLASH_Lock();
 
+  return status;
+}
+
+/**
+ * @brief   This function erases the current flash page.
+ * @param   address: address to be erased.
+ * @return  status: Report about the success of the erasing.
+ */
+flash_status flash_erase_page(uint32_t address)
+{
+  flash_status status = FLASH_OK;
+  FLASH_EraseInitTypeDef erase_init;
+  uint32_t error = 0u;
+
+  erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
+  erase_init.PageAddress = address;
+  erase_init.Banks = FLASH_BANK_1;
+  erase_init.NbPages = 1;
+
+  /* Do the actual erasing. */
+  HAL_FLASH_Unlock();
+  if (HAL_OK != HAL_FLASHEx_Erase(&erase_init, &error))
+  {
+    status = FLASH_ERROR;
+  }
   HAL_FLASH_Lock();
 
   return status;
