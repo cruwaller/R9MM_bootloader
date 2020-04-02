@@ -105,62 +105,59 @@ void duplex_state_set(const enum duplex_state state)
 #if TARGET_R9MM
 static void boot_code(void)
 {
-  int i, ctr;
+  int i;
+  bool BLrequested = false;
+  uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
-  led_red_state_set(0);
+  led_red_state_set(1);
   led_green_state_set(1);
-  /* Send welcome message on startup. */
-  uart_transmit_str(
-      (uint8_t *)"\n\r==========================================\n\r");
-  uart_transmit_str((uint8_t *)"UART Bootloader for ExpressLRS R9mm\n\r");
-  uart_transmit_str(
-      (uint8_t *)"https://github.com/AlessandroAU/ExpressLRS\n\r");
-  uart_transmit_str(
-      (uint8_t *)"==========================================\n\r\n\r");
 
+  /* Send welcome message on startup. */
+  uart_transmit_str((uint8_t *)"\n\r==========================================\n\r");
+  uart_transmit_str((uint8_t *)"UART Bootloader for ExpressLRS R9mm\n\r");
+  uart_transmit_str((uint8_t *)"https://github.com/AlessandroAU/ExpressLRS\n\r");
+  uart_transmit_str((uint8_t *)"==========================================\n\r\n\r");
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
-  uart_transmit_str(
-      (uint8_t
-           *)"Send '2bl', 'bbb' or hold down button to begin bootloader\n\r");
+  uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button to begin bootloader\n\r");
 
+#if 0
   led_red_state_set(1);
   led_green_state_set(0);
   HAL_Delay(100);
   led_red_state_set(1);
   led_green_state_set(1);
-
-  uint8_t header[6] = {0, 0, 0, 0, 0, 0};
+#endif
 
   uart_receive(header, 5u);
 
-  bool BLrequested = false;
   /* Search for magic strings */
   if (strstr((char *)header, "2bl") || strstr((char *)header, "bbb"))
   {
     BLrequested = true;
   }
-  else
-  {
 #ifdef BTN_Pin
-    /* Read button a few times to make sure we pressed it and we are not
-     * sampling noise */
-    ctr = 0;
-    for (i = 0; i < 16; i++)
+  // Wait button press to access bootloader
+  if (!BLrequested) // Check UART if not button not pressed
+    for (i = 0; i < 2; i++)
     {
-      /* Button is active low */
       if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == GPIO_PIN_RESET)
-        ctr++;
-      HAL_Delay(10);
-    }
-    /* if >75% of our samples is 'pressed', we assume it indeed was */
-    if (ctr > 12)
-    {
-      uart_transmit_str((uint8_t *)"Detected button press\n\r");
-      BLrequested = true;
+      {
+        HAL_Delay(100); // wait debounce
+        if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == GPIO_PIN_RESET)
+        {
+          // Button still pressed
+          uart_transmit_str((uint8_t *)"Button press\n\r");
+          BLrequested = true;
+          break;
+        }
+      }
+      else
+      {
+        HAL_Delay(50);
+      }
     }
 #endif /* BTN_Pin */
-  }
 
   if (BLrequested == true)
   {
@@ -174,7 +171,7 @@ static void boot_code(void)
      * it's own purpose, thus if RED stays on there is an error */
     led_red_state_set(1);
     led_green_state_set(0);
-    uart_transmit_str((uint8_t *)"Jumping to user application...\n\r");
+    uart_transmit_str((uint8_t *)"Start app\n\r");
     flash_jump_to_app();
   }
 
