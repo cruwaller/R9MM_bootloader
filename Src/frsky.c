@@ -266,6 +266,10 @@ int8_t frsky_check(void)
                 /* frame start detected capture rest and process */
                 readFrame();
             }
+            else if (!flash_ongoing && timer_end())
+            {
+                goto exit_frsky;
+            }
         }
         else if (!flash_ongoing && timer_end())
         {
