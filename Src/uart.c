@@ -10,8 +10,6 @@
 #include "uart.h"
 #include "main.h"
 
-#include "stm32f1xx.h"
-#include "stm32f1xx_hal.h"
 
 static UART_HandleTypeDef huart1;
 
@@ -207,12 +205,14 @@ void uart_init(void)
   GPIO_TypeDef *gpio_ptr = GPIOA;
   uint16_t pin_rx = 3;
   uint16_t pin_tx = 2;
-#elif UART_NUM == 3
+#elif UART_NUM == 3 && defined(USART3)
   // R9M - S.Port ?
   huart1.Instance = USART3;
   GPIO_TypeDef *gpio_ptr = GPIOB;
   uint16_t pin_rx = 11;
   uint16_t pin_tx = 10;
+#else
+#error "Invalid UART config"
 #endif
 
   /* Configure GPIO pins */
@@ -230,12 +230,13 @@ void uart_init(void)
     __HAL_RCC_USART2_RELEASE_RESET();
     __HAL_RCC_USART2_CLK_ENABLE();
   }
-  else if (huart1.Instance == USART3)
-  {
+#if defined(USART3)
+  else if (huart1.Instance == USART3) {
     __HAL_RCC_USART3_FORCE_RESET();
     __HAL_RCC_USART3_RELEASE_RESET();
     __HAL_RCC_USART3_CLK_ENABLE();
   }
+#endif
 
   /* RX pin */
   GPIO_InitStruct.Pin = (1 << pin_rx);
@@ -250,7 +251,6 @@ void uart_init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
 
-  //enable_pclock((uint32_t)huart1.Instance);
   duplex_state_set(DUPLEX_RX);
 
   huart1.Init.BaudRate = UART_BAUD;

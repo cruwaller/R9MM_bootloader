@@ -10,6 +10,10 @@
 #include "flash.h"
 #include "main.h"
 
+#ifndef FLASH_TYPEPROGRAM_HALFWORD
+#define FLASH_TYPEPROGRAM_HALFWORD 0 // should fail
+#endif
+
 /* Function pointer for jumping to user application. */
 typedef void (*fnc_ptr)(void);
 
@@ -27,7 +31,9 @@ flash_status flash_erase(uint32_t address)
 
   erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
   erase_init.PageAddress = address;
+#ifdef STM32F1
   erase_init.Banks = FLASH_BANK_1;
+#endif
   /* Calculate the number of pages from "address" and the end of flash. */
   erase_init.NbPages = (FLASH_BANK1_END - address) / FLASH_PAGE_SIZE;
   /* Do the actual erasing. */
@@ -54,7 +60,9 @@ flash_status flash_erase_page(uint32_t address)
 
   erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
   erase_init.PageAddress = address;
+#ifdef STM32F1
   erase_init.Banks = FLASH_BANK_1;
+#endif
   erase_init.NbPages = 1;
 
   /* Do the actual erasing. */

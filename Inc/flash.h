@@ -10,7 +10,11 @@
 #ifndef FLASH_H_
 #define FLASH_H_
 
+#ifdef STM32L0xx
+#include "stm32l0xx_hal.h"
+#else
 #include "stm32f1xx_hal.h"
+#endif
 
 /* Start and end addresses of the user application. */
 #ifndef FLASH_BASE
@@ -21,6 +25,10 @@
 #endif
 #define FLASH_APP_START_ADDRESS (FLASH_BASE + FLASH_APP_OFFSET)
 #define FLASH_APP_END_ADDRESS ((uint32_t)FLASH_BANK1_END - 0x10u) /**< Leave a little extra space at the end. */
+
+#ifndef FLASH_BANK1_END
+#define FLASH_BANK1_END FLASH_END
+#endif
 
 /* Status report for the functions. */
 typedef enum

@@ -22,8 +22,13 @@
 #define __MAIN_H
 
 /* Includes ------------------------------------------------------------------*/
+#ifdef STM32L0xx
+#include "stm32l0xx.h"
+#include "stm32l0xx_hal.h"
+#else
 #include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
+#endif
 
 /* Private includes ----------------------------------------------------------*/
 
@@ -46,8 +51,6 @@ void led_green_state_set(const GPIO_PinState state);
 void duplex_state_set(const enum duplex_state state);
 int8_t timer_end(void);
 
-void enable_pclock(uint32_t periph_base);
-
 /* Private defines -----------------------------------------------------------*/
 #ifdef BUTTON
 #define BTN_Pin GPIO_PIN_13
@@ -69,6 +72,9 @@ void enable_pclock(uint32_t periph_base);
 #elif TARGET_R9M
 #define LED_RED_Pin GPIO_PIN_11
 #define LED_RED_GPIO_Port GPIOA
+#elif TARGET_RHF76
+#define LED_RED_Pin GPIO_PIN_4
+#define LED_RED_GPIO_Port GPIOB
 #endif
 #endif /* LED_RED */
 

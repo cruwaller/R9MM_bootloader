@@ -23,15 +23,15 @@
 #include "main.h"
 #include "uart.h"
 #include "flash.h"
-#if TARGET_R9M
+#if (TARGET_FRSKY == 1)
 #if STK500
 #include "stk500.h"
 #else // STK500
 #include "frsky.h"
 #endif // STK500
-#else  // TARGET_R9M
+#elif (TARGET_XMODEM == 1)
 #include "xmodem.h"
-#endif // TARGET_R9M
+#endif // TARGET_XMODEM
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -53,27 +53,6 @@ static void MX_GPIO_Init(void);
 */
 
 /* Private user code ---------------------------------------------------------*/
-void enable_pclock(uint32_t periph_base)
-{
-  if (periph_base < APB2PERIPH_BASE)
-  {
-    uint32_t pos = (periph_base - APB1PERIPH_BASE) / 0x400;
-    RCC->APB1ENR |= (1 << pos);
-    RCC->APB1ENR;
-  }
-  else if (periph_base < AHBPERIPH_BASE)
-  {
-    uint32_t pos = (periph_base - APB2PERIPH_BASE) / 0x400;
-    RCC->APB2ENR |= (1 << pos);
-    RCC->APB2ENR;
-  }
-  else
-  {
-    uint32_t pos = (periph_base - AHBPERIPH_BASE) / 0x400;
-    RCC->AHBENR |= (1 << pos);
-    RCC->AHBENR;
-  }
-}
 
 void led_red_state_set(const GPIO_PinState state)
 {
@@ -102,10 +81,12 @@ void duplex_state_set(const enum duplex_state state)
 #endif
 }
 
-#if TARGET_R9MM
+#if (TARGET_XMODEM == 1)
 static void boot_code(void)
 {
+#ifdef BTN_Pin
   int i;
+#endif
   bool BLrequested = false;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
@@ -191,7 +172,7 @@ static void boot_code(void)
   }
 }
 
-#elif TARGET_R9M
+#elif (TARGET_FRSKY == 1)
 
 #define BOOT_WAIT 2000 // ms
 
@@ -226,7 +207,7 @@ static void boot_code(void)
   }
 }
 
-#endif /* TARGET_R9MM */
+#endif /* TARGET_XMODEM */
 
 /**
  * @brief  The application entry point.
@@ -269,7 +250,13 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+#ifdef STM32L0xx
+#define _FLASH_LATENCY FLASH_LATENCY_1
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+#else
+#define _FLASH_LATENCY FLASH_LATENCY_2
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+#endif
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -284,8 +271,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, _FLASH_LATENCY) != HAL_OK) {
     Error_Handler();
   }
 }
