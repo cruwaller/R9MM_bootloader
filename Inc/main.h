@@ -80,6 +80,10 @@ int8_t timer_end(void);
 #elif TARGET_RHF76
 #define LED_RED_Pin GPIO_PIN_4
 #define LED_RED_GPIO_Port GPIOB
+#elif TARGET_RAK4200
+
+#elif TARGET_RAK811
+
 #endif
 #endif /* LED_RED */
 
