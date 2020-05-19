@@ -25,9 +25,14 @@
 #ifdef STM32L0xx
 #include "stm32l0xx.h"
 #include "stm32l0xx_hal.h"
-#else
+#elif defined(STM32L1xx)
+#include "stm32l1xx.h"
+#include "stm32l1xx_hal.h"
+#elif defined(STM32F1)
 #include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
+#else
+#error "Not supported CPU type!"
 #endif
 
 /* Private includes ----------------------------------------------------------*/

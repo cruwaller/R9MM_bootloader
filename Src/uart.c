@@ -143,7 +143,11 @@ uart_status uart_transmit_ch(uint8_t data)
   /* Make available the UART module. */
   if (HAL_UART_STATE_TIMEOUT == HAL_UART_GetState(&huart1))
   {
+#ifndef STM32L1xx
     HAL_UART_Abort(&huart1);
+#else
+    return status;
+#endif
   }
   duplex_state_set(DUPLEX_TX);
 #if HALF_DUPLEX
@@ -245,13 +249,17 @@ void uart_init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   if (huart1.Instance == USART1 && pin_rx == 7)
   {
+#ifdef STM32L0xx
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
+#endif
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   }
   else
   {
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+#ifdef STM32L0xx
     GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
+#endif
   }
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
 
@@ -260,14 +268,15 @@ void uart_init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  if (huart1.Instance == USART1 && pin_tx == 6)
-  {
+#ifdef STM32L0xx
+  if (huart1.Instance == USART1 && pin_tx == 6) {
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
   }
   else
   {
     GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
   }
+#endif
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
 
   duplex_state_set(DUPLEX_RX);

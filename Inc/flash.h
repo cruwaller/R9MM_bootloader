@@ -12,9 +12,12 @@
 
 #ifdef STM32L0xx
 #include "stm32l0xx_hal.h"
-#else
+#elif defined(STM32L1xx)
+#include "stm32l1xx_hal.h"
+#elif defined(STM32F1)
 #include "stm32f1xx_hal.h"
 #endif
+#include <stdint.h>
 
 /* Start and end addresses of the user application. */
 #ifndef FLASH_BASE
@@ -31,14 +34,15 @@
 #endif
 
 /* Status report for the functions. */
-typedef enum
-{
-  FLASH_OK = 0x00u,             /**< The action was successful. */
-  FLASH_ERROR_SIZE = 0x01u,     /**< The binary is too big. */
-  FLASH_ERROR_WRITE = 0x02u,    /**< Writing failed. */
-  FLASH_ERROR_READBACK = 0x04u, /**< Writing was successful, but the content of the memory is wrong. */
-  FLASH_ERROR = 0xFFu           /**< Generic error. */
-} flash_status;
+#define FLASH_OK 0x00u             /**< The action was successful. */
+#ifndef FLASH_ERROR_SIZE
+#define FLASH_ERROR_SIZE 0x01u     /**< The binary is too big. */
+#endif
+#define FLASH_ERROR_WRITE 0x02u    /**< Writing failed. */
+#define FLASH_ERROR_READBACK 0x04u /**< Writing was successful, but the content of the memory is wrong. */
+#define FLASH_ERROR 0xFFu           /**< Generic error. */
+
+typedef uint8_t flash_status;
 
 flash_status flash_erase(uint32_t address);
 flash_status flash_erase_page(uint32_t address);

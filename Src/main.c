@@ -23,14 +23,14 @@
 #include "main.h"
 #include "uart.h"
 #include "flash.h"
-#if (TARGET_FRSKY == 1)
+#if (TARGET_XMODEM == 1)
+#include "xmodem.h"
+#else
 #if STK500
 #include "stk500.h"
 #else // STK500
 #include "frsky.h"
 #endif // STK500
-#elif (TARGET_XMODEM == 1)
-#include "xmodem.h"
 #endif // TARGET_XMODEM
 
 /* Private typedef -----------------------------------------------------------*/
@@ -164,7 +164,7 @@ static void boot_code(void)
   }
 }
 
-#elif (TARGET_FRSKY == 1)
+#else // TARGET_XMODEM == 0
 
 #define BOOT_WAIT 2000 // ms
 
@@ -279,7 +279,9 @@ void SystemClock_Config(void)
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
 
-#else
+#elif defined(STM32L1xx)
+
+#elif defined(STM32F1)
 
   /** Initializes the CPU, AHB and APB busses clocks
    */
