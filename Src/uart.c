@@ -205,12 +205,14 @@ void uart_init(void)
   GPIO_TypeDef *gpio_ptr = GPIOA;
   uint16_t pin_rx = 3;
   uint16_t pin_tx = 2;
+
 #elif UART_NUM == 3 && defined(USART3)
   // R9M - S.Port ?
   huart1.Instance = USART3;
   GPIO_TypeDef *gpio_ptr = GPIOB;
   uint16_t pin_rx = 11;
   uint16_t pin_tx = 10;
+
 #else
 #error "Invalid UART config"
 #endif
@@ -240,8 +242,17 @@ void uart_init(void)
 
   /* RX pin */
   GPIO_InitStruct.Pin = (1 << pin_rx);
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
+  if (huart1.Instance == USART1 && pin_rx == 7)
+  {
+    GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  }
+  else
+  {
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
+  }
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
 
   /* TX pin */
@@ -249,6 +260,14 @@ void uart_init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  if (huart1.Instance == USART1 && pin_tx == 6)
+  {
+    GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
+  }
+  else
+  {
+    GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
+  }
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
 
   duplex_state_set(DUPLEX_RX);
