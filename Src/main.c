@@ -95,8 +95,8 @@ static void boot_code(void)
 
   /* Send welcome message on startup. */
   uart_transmit_str((uint8_t *)"\n\r==========================================\n\r");
-  uart_transmit_str((uint8_t *)"UART Bootloader for ExpressLRS R9mm\n\r");
-  uart_transmit_str((uint8_t *)"https://github.com/AlessandroAU/ExpressLRS\n\r");
+  uart_transmit_str((uint8_t *)"  UART Bootloader for ExpressLRS\n\r");
+  uart_transmit_str((uint8_t *)"  https://github.com/AlessandroAU/ExpressLRS\n\r");
   uart_transmit_str((uint8_t *)"==========================================\n\r\n\r");
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
