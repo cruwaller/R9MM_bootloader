@@ -160,7 +160,7 @@ static void boot_code(void)
     xmodem_receive();
     /* We only exit the xmodem protocol, if there are any errors.
      * In that case, notify the user and start over. */
-    uart_transmit_str((uint8_t *)"\n\rFailed... Please try again.\n\r");
+    //uart_transmit_str((uint8_t *)"\n\rFailed... Please try again.\n\r");
   }
 }
 
@@ -228,6 +228,7 @@ int main(void)
 void SysTick_Handler(void)
 {
   HAL_IncTick();
+  HAL_SYSTICK_IRQHandler();
 }
 #endif
 

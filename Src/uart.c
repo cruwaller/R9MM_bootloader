@@ -9,7 +9,7 @@
 
 #include "uart.h"
 #include "main.h"
-
+#include <string.h>
 
 static UART_HandleTypeDef huart1;
 
@@ -186,6 +186,8 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
  */
 void uart_init(void)
 {
+  memset(&huart1, 0, sizeof(huart1));
+
 #ifdef DEBUG_UART
   debug_init();
 #endif
@@ -247,6 +249,7 @@ void uart_init(void)
   /* RX pin */
   GPIO_InitStruct.Pin = (1 << pin_rx);
   GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   if (huart1.Instance == USART1 && pin_rx == 7)
   {
 #ifdef STM32L0xx
