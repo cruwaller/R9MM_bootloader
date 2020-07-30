@@ -85,6 +85,9 @@ int8_t timer_end(void);
 #define LED_RED_GPIO_Port GPIOA
 #elif TARGET_RAK811
 
+#elif TARGET_SX1280_RX_v02
+#define LED_RED_Pin GPIO_PIN_15
+#define LED_RED_GPIO_Port GPIOB
 #endif
 #endif /* LED_RED */
 
