@@ -23,40 +23,63 @@
 #include "main.h"
 #include "uart.h"
 #include "flash.h"
-#if (TARGET_XMODEM == 1)
+#if XMODEM
 #include "xmodem.h"
-#else
-#if STK500
+#elif STK500
 #include "stk500.h"
-#else // STK500
+#elif FRSKY
 #include "frsky.h"
-#endif // STK500
-#endif // TARGET_XMODEM
+#else
+#error "Upload protocol not defined!"
+#endif
 
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
 
+#define BUTTON_NEW_BOUNCE 1
+
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
+
+#if defined(BUTTON_PIN)
+void *btn_port;
+uint16_t btn_pin;
+#endif
+#if defined(LED_RED_PIN)
+void *led_red_port;
+uint16_t led_red_pin;
+#endif
+#if defined(LED_GREEN_PIN)
+void *led_green_port;
+uint16_t led_green_pin;
+#endif
+#if defined(DUPLEX_PIN)
+void *duplex_port;
+uint16_t duplex_pin;
+#endif
+
+#if defined(BUTTON_PIN)
+#define BTN_READ() HAL_GPIO_ReadPin(btn_port, btn_pin)
+#elif defined(BTN_Pin)
+#define BTN_READ() HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin)
+#endif
+#ifndef BUTTON_INVERTED
+#define BUTTON_INVERTED   1
+#endif // BUTTON_INVERTED
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 
-/*static void delay(int x) {
-    for (int i = 0; i < x; i++)
-        for (int j = 0; j < 500; j++)
-            __asm__("nop");
-}
-*/
-
 /* Private user code ---------------------------------------------------------*/
 
 void led_red_state_set(const GPIO_PinState state)
 {
-#ifdef LED_RED_Pin
+#if defined(LED_RED_PIN)
+  HAL_GPIO_WritePin(led_red_port, led_red_pin, state);
+#elif defined(LED_RED_Pin) && defined(LED_RED_GPIO_Port)
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);
 #else
   (void)state;
@@ -65,7 +88,9 @@ void led_red_state_set(const GPIO_PinState state)
 
 void led_green_state_set(const GPIO_PinState state)
 {
-#ifdef LED_GRN_Pin
+#if defined(LED_GREEN_PIN)
+  HAL_GPIO_WritePin(led_green_port, led_green_pin, state);
+#elif defined(LED_GRN_Pin) && defined(LED_GRN_GPIO_Port)
   HAL_GPIO_WritePin(LED_GRN_GPIO_Port, LED_GRN_Pin, state);
 #else
   (void)state;
@@ -74,19 +99,18 @@ void led_green_state_set(const GPIO_PinState state)
 
 void duplex_state_set(const enum duplex_state state)
 {
-#ifdef DUPLEX_Pin
+#if defined(DUPLEX_PIN)
+  HAL_GPIO_WritePin(duplex_port, duplex_pin, (state == DUPLEX_TX));
+#elif defined(DUPLEX_Pin) && defined(DUPLEX_Port)
   HAL_GPIO_WritePin(DUPLEX_Port, DUPLEX_Pin, (state == DUPLEX_TX));
 #else
   (void)state;
 #endif
 }
 
-#if (TARGET_XMODEM == 1)
+#if XMODEM
 static void boot_code(void)
 {
-#ifdef BTN_Pin
-  int i;
-#endif
   bool BLrequested = false;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
@@ -102,6 +126,11 @@ static void boot_code(void)
    * otherwise stay in the bootloader. */
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button to begin bootloader\n\r");
 
+#if defined(BTN_READ) && BUTTON_NEW_BOUNCE
+  GPIO_PinState btn_val = BTN_READ();
+#endif
+
+  /* Wait input from UART */
   uart_receive(header, 5u);
 
   /* Search for magic strings */
@@ -109,15 +138,23 @@ static void boot_code(void)
   {
     BLrequested = true;
   }
-#ifdef BTN_Pin
+#if defined(BTN_READ)
+#if BUTTON_NEW_BOUNCE
+  // Debounce check (1sec)
+  else if (BTN_READ() == btn_val && (btn_val ^ BUTTON_INVERTED) == GPIO_PIN_SET) {
+    // Button value is still same and is pressed
+    uart_transmit_str((uint8_t *)"Button press\n\r");
+    BLrequested = true;
+  }
+#else // !BUTTON_NEW_BOUNCE
   // Wait button press to access bootloader
   if (!BLrequested) // Check UART if not button not pressed
-    for (i = 0; i < 2; i++)
+    for (int i = 0; i < 2; i++)
     {
-      if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == GPIO_PIN_RESET)
+      if (BTN_READ() == GPIO_PIN_RESET)
       {
         HAL_Delay(100); // wait debounce
-        if (HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin) == GPIO_PIN_RESET)
+        if (BTN_READ() == GPIO_PIN_RESET)
         {
           // Button still pressed
           uart_transmit_str((uint8_t *)"Button press\n\r");
@@ -130,7 +167,8 @@ static void boot_code(void)
         HAL_Delay(50);
       }
     }
-#endif /* BTN_Pin */
+#endif /* BUTTON_NEW_BOUNCE */
+#endif /* BTN_READ */
 
   if (BLrequested == true)
   {
@@ -151,12 +189,6 @@ static void boot_code(void)
   /* Infinite loop */
   while (1)
   {
-
-    /* Turn on the green LED to indicate, that we are in bootloader mode.*/
-    // HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-    /* Ask for new data and start the Xmodem protocol. */
-    // uart_transmit_str((uint8_t*)"Please send a new binary file with Xmodem
-    // protocol to update the firmware.\n\r");
     xmodem_receive();
     /* We only exit the xmodem protocol, if there are any errors.
      * In that case, notify the user and start over. */
@@ -164,7 +196,7 @@ static void boot_code(void)
   }
 }
 
-#else // TARGET_XMODEM == 0
+#else // !XMODEM
 
 #define BOOT_WAIT 2000 // ms
 
@@ -199,7 +231,7 @@ static void boot_code(void)
   }
 }
 
-#endif /* TARGET_XMODEM */
+#endif /* XMODEM */
 
 /**
  * @brief  The application entry point.
@@ -226,13 +258,16 @@ int main(void)
   boot_code();
 }
 
-#if defined(STM32L0xx) || defined(STM32L4xx)
+#if 0
+#if !defined(STM32F1)
 void SysTick_Handler(void)
 {
   HAL_IncTick();
   HAL_SYSTICK_IRQHandler();
 }
 #endif
+#endif
+
 
 /**
  * @brief System Clock Configuration
@@ -266,11 +301,17 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLN = 10; // 10 * 16MHz
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2; // 160MHz / 2
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7; // 160MHz / 7
+#if defined(STM32L432xx)
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV4; // 160MHz / 4
+#else // !STM32L432xx
+  /* STM32L433 */
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2; // 160MHz / 2
-#else
+#endif // STM32L432xx
+
+#else // !STM32L4xx
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL4;
   RCC_OscInitStruct.PLL.PLLDIV = RCC_PLL_DIV2;
-#endif
+#endif // STM32L4xx
   RCC_OscInitStruct.HSICalibrationValue = 0x10;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
     Error_Handler();
@@ -284,9 +325,9 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 #if defined(STM32L4xx)
   uint32_t flash_latency = FLASH_LATENCY_4;
-#else
+#else // !STM32L4xx
   uint32_t flash_latency = FLASH_LATENCY_1;
-#endif
+#endif // STM32L4xx
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, flash_latency) != HAL_OK)
     Error_Handler();
 
@@ -338,28 +379,52 @@ void SystemClock_Config(void)
  */
 static void MX_GPIO_Init(void)
 {
-#if defined(BTN_Pin) || defined(LED_GRN_Pin) || defined(LED_RED_Pin) || defined(DUPLEX_Pin)
+#if defined(BTN_Pin)     || defined(LED_GRN_Pin) || defined(LED_RED_Pin)   || \
+    defined(DUPLEX_Pin)  || defined(BUTTON_PIN)  || defined(LED_GREEN_PIN) || \
+    defined(LED_RED_PIN) || defined(DUPLEX_PIN)
   GPIO_InitTypeDef GPIO_InitStruct;
 #endif
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-#ifndef TARGET_RAK4200
+#if !defined(TARGET_RAK4200)
+#ifdef __HAL_RCC_GPIOC_CLK_ENABLE
   __HAL_RCC_GPIOC_CLK_ENABLE();
+#endif
+#ifdef __HAL_RCC_GPIOD_CLK_ENABLE
   __HAL_RCC_GPIOD_CLK_ENABLE();
 #endif
+#endif
 
-#ifdef BTN_Pin
+#if defined(BUTTON_PIN)
+  gpio_port_pin_get(CREATE_IO(BUTTON_PIN), &btn_port, &btn_pin);
+  /*Configure GPIO pin : BTN_Pin */
+  GPIO_InitStruct.Pin = btn_pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = BUTTON_INVERTED ? GPIO_PULLUP : GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(btn_port, &GPIO_InitStruct);
+
+#elif defined(BTN_Pin) && defined(BTN_GPIO_Port)
   /*Configure GPIO pin : BTN_Pin */
   GPIO_InitStruct.Pin = BTN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = BUTTON_INVERTED ? GPIO_PULLUP : GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(BTN_GPIO_Port, &GPIO_InitStruct);
 #endif
 
-#ifdef LED_GRN_Pin
+#if defined(LED_GREEN_PIN)
+  gpio_port_pin_get(CREATE_IO(LED_GREEN_PIN), &led_green_port, &led_green_pin);
+  GPIO_InitStruct.Pin = led_green_pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(led_green_port, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(led_green_port, led_green_pin, GPIO_PIN_RESET);
+#elif defined(LED_GRN_Pin) && defined(LED_GRN_GPIO_Port)
   /*Configure GPIO pin : LED_GRN_Pin */
   GPIO_InitStruct.Pin = LED_GRN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -370,7 +435,16 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_GRN_GPIO_Port, LED_GRN_Pin, GPIO_PIN_RESET);
 #endif
 
-#ifdef LED_RED_Pin
+#if defined(LED_RED_PIN)
+  gpio_port_pin_get(CREATE_IO(LED_RED_PIN), &led_red_port, &led_red_pin);
+  GPIO_InitStruct.Pin = led_red_pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(led_red_port, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(led_red_port, led_red_pin, GPIO_PIN_RESET);
+#elif defined(LED_RED_Pin) && defined(LED_RED_GPIO_Port)
   /*Configure GPIO pin : LED_RED_Pin */
   GPIO_InitStruct.Pin = LED_RED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -381,8 +455,17 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
 #endif
 
-#ifdef DUPLEX_Pin
-  /*Configure GPIO pin : DUPLEX_Pin */
+#if defined(DUPLEX_PIN)
+  gpio_port_pin_get(CREATE_IO(DUPLEX_PIN), &duplex_port, &led_red_pin);
+  GPIO_InitStruct.Pin = duplex_pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(duplex_port, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(duplex_port, duplex_pin, GPIO_PIN_RESET);
+#elif defined(DUPLEX_Pin) && defined(DUPLEX_Port)
+  /* Configure GPIO pin : DUPLEX_Pin */
   GPIO_InitStruct.Pin = DUPLEX_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;

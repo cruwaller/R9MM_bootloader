@@ -52,6 +52,9 @@ enum duplex_state
   DUPLEX_TX,
 };
 
+#define CREATE_IO_IMPL(port, pin) (((port) << 8) + pin)
+#define CREATE_IO(...) CREATE_IO_IMPL(__VA_ARGS__)
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 void led_red_state_set(const GPIO_PinState state);
@@ -59,7 +62,20 @@ void led_green_state_set(const GPIO_PinState state);
 void duplex_state_set(const enum duplex_state state);
 int8_t timer_end(void);
 
+static inline void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
+{
+  *pin = io % 32;
+  io = (io >> 8) - 'A';
+  *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
+
+  // Enable clk??
+}
+
 /* Private defines -----------------------------------------------------------*/
+#if !defined(XMODEM) && !STK500 && !FRSKY
+#define XMODEM 1 // Default is XMODEM protocol
+#endif
+
 #ifdef BUTTON
 #if TARGET_R9MX
 #define BTN_Pin GPIO_PIN_0
@@ -69,6 +85,7 @@ int8_t timer_end(void);
 #define BTN_GPIO_Port GPIOC
 #endif
 #endif /* BUTTON */
+
 #ifdef LED_GRN
 #if TARGET_R9MM
 #define LED_GRN_Pin GPIO_PIN_3
@@ -81,6 +98,7 @@ int8_t timer_end(void);
 #define LED_GRN_GPIO_Port GPIOB
 #endif
 #endif /* LED_GRN */
+
 #ifdef LED_RED
 #if TARGET_R9MM
 #define LED_RED_Pin GPIO_PIN_1
@@ -96,7 +114,7 @@ int8_t timer_end(void);
 #define LED_RED_GPIO_Port GPIOA
 #elif TARGET_RAK811
 
-#elif TARGET_SX1280_RX_v02
+#elif TARGET_SX1280_RX_2020_v02
 #define LED_RED_Pin GPIO_PIN_15
 #define LED_RED_GPIO_Port GPIOB
 #elif TARGET_R9MX
@@ -108,7 +126,7 @@ int8_t timer_end(void);
 #if TARGET_R9M
 #define DUPLEX_Pin GPIO_PIN_5
 #define DUPLEX_Port GPIOA
-#endif
+#endif /* TARGET_R9M */
 
 #endif /* __MAIN_H */
 
