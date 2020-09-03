@@ -62,14 +62,7 @@ void led_green_state_set(const GPIO_PinState state);
 void duplex_state_set(const enum duplex_state state);
 int8_t timer_end(void);
 
-static inline void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
-{
-  *pin = io % 32;
-  io = (io >> 8) - 'A';
-  *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
-
-  // Enable clk??
-}
+void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin);
 
 /* Private defines -----------------------------------------------------------*/
 #if !defined(XMODEM) && !STK500 && !FRSKY
@@ -83,6 +76,9 @@ static inline void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
 #elif TARGET_R9MM
 #define BTN_Pin GPIO_PIN_13
 #define BTN_GPIO_Port GPIOC
+#elif TARGET_SX1280_RX_Nano_v05
+#define BTN_Pin GPIO_PIN_3
+#define BTN_GPIO_Port GPIOA
 #endif
 #endif /* BUTTON */
 
@@ -119,6 +115,9 @@ static inline void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
 #define LED_RED_GPIO_Port GPIOB
 #elif TARGET_R9MX
 #define LED_RED_Pin GPIO_PIN_2
+#define LED_RED_GPIO_Port GPIOB
+#elif TARGET_SX1280_RX_Nano_v05
+#define LED_RED_Pin GPIO_PIN_5
 #define LED_RED_GPIO_Port GPIOB
 #endif
 #endif /* LED_RED */

@@ -35,7 +35,7 @@ def get_commands(env, firmware):
         if bootloader is not None:
             BL_CMD = [TOOL, "-c SWD SWCLK=8 -P",
                 bootloader, hex(flash_start)]
-        APP_CMD = [TOOL, "-c SWD SWCLK=8 -P",
+        APP_CMD = [TOOL, "-c SWD UR SWCLK=8 -P",
             firmware, hex(app_start), "-RST"]
     elif "linux" in platform_name:
         TOOL = os.path.join(

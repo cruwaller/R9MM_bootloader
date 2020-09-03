@@ -75,6 +75,15 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 
+void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
+{
+  *pin = io % 32;
+  io = (io >> 8) - 'A';
+  *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
+
+  // Enable clk??
+}
+
 void led_red_state_set(const GPIO_PinState state)
 {
 #if defined(LED_RED_PIN)
