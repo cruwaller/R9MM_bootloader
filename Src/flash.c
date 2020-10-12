@@ -225,15 +225,14 @@ void flash_jump_to_app(void)
   /* Function pointer to the address of the user application. */
   volatile fnc_ptr jump_to_app;
   jump_to_app = (fnc_ptr)(*(volatile uint32_t *)(FLASH_APP_START_ADDRESS + 4u));
-  //led_red_state_set(1);
-  //HAL_Delay(500);
+  /* Remove configs before jump. */
   HAL_DeInit();
   /* Change the main stack pointer. */
-  //__set_MSP(*(volatile uint32_t *)FLASH_APP_START_ADDRESS);
-
 #if !defined(STM32L4xx)
-  //asm volatile("msr msp, %0" ::"g"(*(volatile uint32_t *)FLASH_APP_START_ADDRESS));
-  //SCB->VTOR = (__IO uint32_t)(FLASH_APP_START_ADDRESS);
+  asm volatile("msr msp, %0" ::"g"(*(volatile uint32_t *)FLASH_APP_START_ADDRESS));
+  SCB->VTOR = (__IO uint32_t)(FLASH_APP_START_ADDRESS);
+#else
+  __set_MSP(*(volatile uint32_t *)FLASH_APP_START_ADDRESS);
 #endif
   jump_to_app();
 }

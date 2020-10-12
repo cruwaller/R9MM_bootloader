@@ -207,7 +207,7 @@ static void boot_code(void)
 
 #else // !XMODEM
 
-#define BOOT_WAIT 2000 // ms
+#define BOOT_WAIT 300 // ms
 
 static uint32_t boot_end_time;
 
@@ -249,6 +249,10 @@ static void boot_code(void)
 int main(void)
 {
   /* MCU Configuration---------------------------------------------*/
+
+  /* Make sure the vectors are set correctly */
+  extern uint32_t g_pfnVectors;
+  SCB->VTOR = (uint32_t) &g_pfnVectors;
 
   /* Reset of all peripherals, Initializes the Flash interface and the
    * Systick.
