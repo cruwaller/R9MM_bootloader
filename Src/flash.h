@@ -23,25 +23,28 @@
 #endif
 #include <stdint.h>
 
+/* Extern vertor start address */
+extern uint32_t g_pfnVectors;
+#define BL_FLASH_START ((uint32_t)&g_pfnVectors)
+
+/* Application space offset */
+#ifndef FLASH_APP_OFFSET
+#error "FLASH_APP_OFFSET is mandatory parameter!"
+#endif // FLASH_APP_OFFSET
+
 /* Start and end addresses of the user application. */
 #ifndef FLASH_BASE
 #define FLASH_BASE ((uint32_t)0x08000000u)
 #endif
-#ifndef FLASH_APP_OFFSET
-#define FLASH_APP_OFFSET ((uint32_t)0x8000u)
-#endif
 #define FLASH_APP_START_ADDRESS (FLASH_BASE + FLASH_APP_OFFSET)
 #define FLASH_APP_END_ADDRESS ((uint32_t)FLASH_BANK1_END - 0x10u) /**< Leave a little extra space at the end. */
 
-#if !defined(FLASH_END) /*&& defined(STM32L4xx)*/
-#if defined(FLASH_APP_OFFSET)
-#define FLASH_END (FLASH_BASE + FLASH_APP_OFFSET)
-#else // FLASH_APP_OFFSET
-#define FLASH_END (FLASH_BASE + 0x20000) // default to 128kB just in case
-#endif // FLASH_APP_OFFSET
-#endif
+#if !defined(BL_FLASH_END) /*&& defined(STM32L4xx)*/
+#define BL_FLASH_END (FLASH_BASE + FLASH_APP_OFFSET)
+#endif //BL_FLASH_END
+
 #ifndef FLASH_BANK1_END
-#define FLASH_BANK1_END FLASH_END
+#define FLASH_BANK1_END BL_FLASH_END
 #endif
 
 /* Status report for the functions. */

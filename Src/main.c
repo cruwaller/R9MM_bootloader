@@ -251,8 +251,7 @@ int main(void)
   /* MCU Configuration---------------------------------------------*/
 
   /* Make sure the vectors are set correctly */
-  extern uint32_t g_pfnVectors;
-  SCB->VTOR = (uint32_t) &g_pfnVectors;
+  SCB->VTOR = BL_FLASH_START;
 
   /* Reset of all peripherals, Initializes the Flash interface and the
    * Systick.
@@ -465,7 +464,7 @@ static void MX_GPIO_Init(void)
 #endif
 
 #if defined(DUPLEX_PIN)
-  gpio_port_pin_get(CREATE_IO(DUPLEX_PIN), &duplex_port, &led_red_pin);
+  gpio_port_pin_get(CREATE_IO(DUPLEX_PIN), &duplex_port, &duplex_pin);
   GPIO_InitStruct.Pin = duplex_pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
