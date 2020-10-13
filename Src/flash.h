@@ -18,6 +18,8 @@
 #include "stm32l4xx_hal.h"
 #elif defined(STM32F1)
 #include "stm32f1xx_hal.h"
+#elif defined(STM32F3xx)
+#include "stm32f3xx_hal.h"
 #endif
 #include <stdint.h>
 
@@ -31,8 +33,12 @@
 #define FLASH_APP_START_ADDRESS (FLASH_BASE + FLASH_APP_OFFSET)
 #define FLASH_APP_END_ADDRESS ((uint32_t)FLASH_BANK1_END - 0x10u) /**< Leave a little extra space at the end. */
 
-#if !defined(FLASH_END) && defined(STM32L4xx)
+#if !defined(FLASH_END) /*&& defined(STM32L4xx)*/
+#if defined(FLASH_APP_OFFSET)
+#define FLASH_END (FLASH_BASE + FLASH_APP_OFFSET)
+#else // FLASH_APP_OFFSET
 #define FLASH_END (FLASH_BASE + 0x20000) // default to 128kB just in case
+#endif // FLASH_APP_OFFSET
 #endif
 #ifndef FLASH_BANK1_END
 #define FLASH_BANK1_END FLASH_END

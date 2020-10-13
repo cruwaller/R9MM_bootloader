@@ -31,6 +31,9 @@
 #elif defined(STM32F1)
 #include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
+#elif defined(STM32F3xx)
+#include "stm32f3xx.h"
+#include "stm32f3xx_hal.h"
 #elif defined(STM32L4xx)
 #include "stm32l4xx.h"
 #include "stm32l4xx_hal.h"
@@ -79,6 +82,9 @@ void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin);
 #elif TARGET_SX1280_RX_Nano_v05
 #define BTN_Pin GPIO_PIN_3
 #define BTN_GPIO_Port GPIOA
+#elif TARGET_GHOST_RX_V1_2
+//#define BTN_Pin GPIO_PIN_3
+//#define BTN_GPIO_Port GPIOA
 #endif
 #endif /* BUTTON */
 
@@ -119,6 +125,9 @@ void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin);
 #elif TARGET_SX1280_RX_Nano_v05
 #define LED_RED_Pin GPIO_PIN_5
 #define LED_RED_GPIO_Port GPIOB
+#elif TARGET_GHOST_RX_V1_2
+//#define LED_RED_Pin GPIO_PIN_5
+//#define LED_RED_GPIO_Port GPIOB
 #endif
 #endif /* LED_RED */
 

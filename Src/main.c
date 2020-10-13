@@ -346,7 +346,7 @@ void SystemClock_Config(void)
 #elif defined(STM32L1xx)
 #warning "Clock setup is missing! Should use HSI!"
 
-#elif defined(STM32F1)
+#elif defined(STM32F1) || defined(STM32F3xx)
 
   /** Initializes the CPU, AHB and APB busses clocks
    */
@@ -354,8 +354,14 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12;
+#if defined(STM32F3xx)
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI; // 8MHz / DIV2 = 4MHz
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16; // 16 * 4MHz = 64MHz
+#else
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2; // 8MHz / DIV2 = 4MHz
+  //RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12; // 12 * 4MHz = 48MHz
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16; // 16 * 4MHz = 64MHz
+#endif
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
