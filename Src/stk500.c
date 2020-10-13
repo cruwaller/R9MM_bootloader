@@ -57,6 +57,7 @@ static int8_t stk500_update(void)
   for (retval = 0; retval == 0;)
   {
     /* get character from UART */
+    ch = 0;
     if (uart_receive_timeout(&ch, 1u, 20) == UART_ERROR)
     {
       if (!insync && timer_end())
