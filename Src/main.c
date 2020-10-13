@@ -271,16 +271,6 @@ int main(void)
   boot_code();
 }
 
-#if 0
-#if !defined(STM32F1)
-void SysTick_Handler(void)
-{
-  HAL_IncTick();
-  HAL_SYSTICK_IRQHandler();
-}
-#endif
-#endif
-
 
 /**
  * @brief System Clock Configuration
