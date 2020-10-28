@@ -37,15 +37,24 @@ extern uint32_t g_pfnVectors;
 #define FLASH_BASE ((uint32_t)0x08000000u)
 #endif
 #define FLASH_APP_START_ADDRESS (FLASH_BASE + FLASH_APP_OFFSET)
-#define FLASH_APP_END_ADDRESS ((uint32_t)FLASH_BANK1_END - 0x10u) /**< Leave a little extra space at the end. */
+#define FLASH_APP_END_ADDRESS ((uint32_t)FLASH_BANK1_END)
 
-#if !defined(BL_FLASH_END) /*&& defined(STM32L4xx)*/
+#if !defined(FLASH_BANK1_END)
+#if defined(FLASH_END)
+#define FLASH_BANK1_END (FLASH_END)
+#elif defined(FLASH_BANK_SIZE)
+#define FLASH_BANK1_END (FLASH_BASE + FLASH_BANK_SIZE - 0x1)
+#elif /*defined(STM32F3xx) &&*/ defined(FLASH_SIZE_DATA_REGISTER)
+uint32_t get_flash_end(void);
+#define FLASH_BANK1_END get_flash_end()
+#else
+#if !defined(BL_FLASH_END)
 #define BL_FLASH_END (FLASH_BASE + FLASH_APP_OFFSET)
-#endif //BL_FLASH_END
-
-#ifndef FLASH_BANK1_END
+#endif
 #define FLASH_BANK1_END BL_FLASH_END
 #endif
+#endif /* !FLASH_BANK1_END */
+
 
 /* Status report for the functions. */
 #define FLASH_OK 0x00u             /**< The action was successful. */
