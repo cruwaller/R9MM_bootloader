@@ -131,6 +131,10 @@ static void boot_code(void)
   uart_transmit_str((uint8_t *)"  UART Bootloader for ExpressLRS\n\r");
   uart_transmit_str((uint8_t *)"  https://github.com/AlessandroAU/ExpressLRS\n\r");
   uart_transmit_str((uint8_t *)"==========================================\n\r\n\r");
+#if defined(MCU_TYPE)
+  uart_transmit_str((uint8_t *)BUILD_MCU_TYPE(MCU_TYPE));
+  uart_transmit_str((uint8_t *)"\n\r");
+#endif
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button to begin bootloader\n\r");

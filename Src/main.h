@@ -41,6 +41,9 @@
 #error "Not supported CPU type!"
 #endif
 
+#define STRINGIFY(str) #str
+#define BUILD_MCU_TYPE(type) STRINGIFY(BL_TYPE: type)
+
 /* Private includes ----------------------------------------------------------*/
 
 /* Exported types ------------------------------------------------------------*/
