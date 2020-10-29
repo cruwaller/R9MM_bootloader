@@ -1,0 +1,39 @@
+1) HAL
+2) LL
+
+
+R9MM:
+1) Flash: [==        ]  17.8% (used 5836 bytes from 32768 bytes)
+2) Flash: [=         ]  14.8% (used 4840 bytes from 32768 bytes)
+
+R9M:
+1) Flash: [=======   ]  68.9% (used 5644 bytes from 8192 bytes)
+2) Flash: [======    ]  55.1% (used 4516 bytes from 8192 bytes)
+
+R9M stock:
+1) Flash: [=======   ]  68.4% (used 5600 bytes from 8192 bytes)
+2) Flash: [=====     ]  54.6% (used 4472 bytes from 8192 bytes)
+
+RHF76:
+1) Flash: [=====     ]  49.7% (used 8148 bytes from 16384 bytes)
+2) Flash: [===       ]  34.6% (used 5672 bytes from 16384 bytes)
+
+RAK:
+1) Flash: [=====     ]  50.2% (used 8228 bytes from 16384 bytes)
+2) Flash: [===       ]  35.0% (used 5732 bytes from 16384 bytes)
+
+1280_2020:
+1) Flash: [====      ]  35.2% (used 5760 bytes from 16384 bytes)
+2) Flash: [===       ]  28.7% (used 4700 bytes from 16384 bytes)
+
+CCG Nano:
+1) Flash: [======    ]  55.2% (used 9052 bytes from 16384 bytes)
+2) Flash: [====      ]  41.6% (used 6808 bytes from 16384 bytes)
+
+R9MX:
+1) Flash: [===       ]  28.5% (used 9332 bytes from 32768 bytes)
+2) Flash: [==        ]  21.1% (used 6924 bytes from 32768 bytes)
+
+ATTO:
+1) Flash: [=====     ]  48.0% (used 7868 bytes from 16384 bytes)
+2) Flash: [====      ]  39.6% (used 6480 bytes from 16384 bytes)

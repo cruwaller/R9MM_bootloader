@@ -25,18 +25,28 @@
 #ifdef STM32L0xx
 #include "stm32l0xx.h"
 #include "stm32l0xx_hal.h"
+#include "stm32l0xx_ll_gpio.h"
+#include "stm32l0xx_ll_usart.h"
 #elif defined(STM32L1xx)
 #include "stm32l1xx.h"
 #include "stm32l1xx_hal.h"
+#include "stm32l1xx_ll_gpio.h"
+#include "stm32l1xx_ll_usart.h"
 #elif defined(STM32F1)
 #include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
+#include "stm32f1xx_ll_gpio.h"
+#include "stm32f1xx_ll_usart.h"
 #elif defined(STM32F3xx)
 #include "stm32f3xx.h"
 #include "stm32f3xx_hal.h"
+#include "stm32f3xx_ll_gpio.h"
+#include "stm32f3xx_ll_usart.h"
 #elif defined(STM32L4xx)
 #include "stm32l4xx.h"
 #include "stm32l4xx_hal.h"
+#include "stm32l4xx_ll_gpio.h"
+#include "stm32l4xx_ll_usart.h"
 #else
 #error "Not supported CPU type!"
 #endif
@@ -86,8 +96,8 @@ void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin);
 #define BTN_Pin GPIO_PIN_3
 #define BTN_GPIO_Port GPIOA
 #elif TARGET_GHOST_RX_V1_2
-//#define BTN_Pin GPIO_PIN_3
-//#define BTN_GPIO_Port GPIOA
+#define BTN_Pin GPIO_PIN_12
+#define BTN_GPIO_Port GPIOA
 #endif
 #endif /* BUTTON */
 
@@ -129,8 +139,8 @@ void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin);
 #define LED_RED_Pin GPIO_PIN_5
 #define LED_RED_GPIO_Port GPIOB
 #elif TARGET_GHOST_RX_V1_2
-//#define LED_RED_Pin GPIO_PIN_5
-//#define LED_RED_GPIO_Port GPIOB
+#define WS2812_LED_Pin GPIO_PIN_7
+#define WS2812_LED_Port GPIOA
 #endif
 #endif /* LED_RED */
 

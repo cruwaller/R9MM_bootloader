@@ -11,6 +11,15 @@
 #include "main.h"
 #include <string.h>
 
+#if USART_USE_LL
+USART_TypeDef *UART_handle;
+#if TARGET_GHOST_RX_V1_2
+USART_TypeDef *UART_handle_tx;
+#define UART_TX_HANDLE UART_handle_tx
+#else
+#define UART_TX_HANDLE UART_handle
+#endif
+#else // !USART_USE_LL
 static UART_HandleTypeDef huart1;
 #if TARGET_GHOST_RX_V1_2
 static UART_HandleTypeDef huart_tx;
@@ -18,6 +27,7 @@ static UART_HandleTypeDef huart_tx;
 #else
 #define UART_TX_HANDLE huart1
 #endif
+#endif // USART_USE_LL
 
 #ifndef UART_BAUD
 #define UART_BAUD 420000
@@ -88,28 +98,40 @@ void debug_send(uint8_t data)
  */
 uart_status uart_receive(uint8_t *data, uint16_t length)
 {
-  uart_status status = UART_ERROR;
-#if HALF_DUPLEX
-  HAL_HalfDuplex_EnableReceiver(&huart1);
-#endif
-  if (HAL_OK == HAL_UART_Receive(&huart1, data, length, UART_TIMEOUT))
-  {
-    status = UART_OK;
-  }
-  return status;
+  return uart_receive_timeout(data, length, UART_TIMEOUT);
 }
 
 uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeout)
 {
-  uart_status status = UART_ERROR;
 #if HALF_DUPLEX
+#if USART_USE_LL
+  UART_handle->CR1 = USART_CR1_UE | USART_CR1_RE;
+#else
   HAL_HalfDuplex_EnableReceiver(&huart1);
 #endif
+#endif
+
+#if USART_USE_LL
+  uint32_t tickstart = HAL_GetTick();
+  while (length--) {
+    while (!LL_USART_IsActiveFlag_RXNE(UART_handle)) {
+      /* Check for the Timeout */
+      if (timeout != HAL_MAX_DELAY) {
+        if ((timeout == 0U) || ((HAL_GetTick() - tickstart) > timeout)) {
+          return UART_ERROR;
+        }
+      }
+    }
+    *data++ = (uint8_t)LL_USART_ReceiveData8(UART_handle);
+  }
+  return UART_OK;
+#else
   if (HAL_OK == HAL_UART_Receive(&huart1, data, length, timeout))
   {
-    status = UART_OK;
+    return UART_OK;
   }
-  return status;
+  return UART_ERROR;
+#endif
 }
 
 /**
@@ -119,26 +141,12 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
  */
 uart_status uart_transmit_str(uint8_t *data)
 {
-  uart_status status = UART_ERROR;
-  uint16_t length = 0u;
-
+  uint32_t length = 0u;
   /* Calculate the length. */
-  while ('\0' != data[length])
-  {
+  while ('\0' != data[length]) {
     length++;
   }
-
-  duplex_state_set(DUPLEX_TX);
-#if HALF_DUPLEX
-  HAL_HalfDuplex_EnableTransmitter(&UART_TX_HANDLE);
-#endif
-  if (HAL_OK == HAL_UART_Transmit(&UART_TX_HANDLE, data, length, UART_TIMEOUT))
-  {
-    status = UART_OK;
-  }
-  duplex_state_set(DUPLEX_RX);
-
-  return status;
+  return uart_transmit_bytes(data, length);
 }
 
 /**
@@ -148,28 +156,7 @@ uart_status uart_transmit_str(uint8_t *data)
  */
 uart_status uart_transmit_ch(uint8_t data)
 {
-  uart_status status = UART_ERROR;
-
-  /* Make available the UART module. */
-  if (HAL_UART_STATE_TIMEOUT == HAL_UART_GetState(&UART_TX_HANDLE))
-  {
-#ifndef STM32L1xx
-    HAL_UART_Abort(&UART_TX_HANDLE);
-#else
-    return status;
-#endif
-  }
-  duplex_state_set(DUPLEX_TX);
-#if HALF_DUPLEX
-  HAL_HalfDuplex_EnableTransmitter(&UART_TX_HANDLE);
-#endif
-  if (HAL_OK == HAL_UART_Transmit(&UART_TX_HANDLE, &data, 1u, UART_TIMEOUT))
-  {
-    status = UART_OK;
-  }
-  duplex_state_set(DUPLEX_RX);
-
-  return status;
+  return uart_transmit_bytes(&data, 1u);
 }
 
 uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
@@ -178,16 +165,41 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
 
   duplex_state_set(DUPLEX_TX);
 #if HALF_DUPLEX
+#if USART_USE_LL
+  UART_TX_HANDLE->CR1 = USART_CR1_UE | USART_CR1_TE;
+#else
   HAL_HalfDuplex_EnableTransmitter(&UART_TX_HANDLE);
 #endif
-  if (HAL_OK == HAL_UART_Transmit(&UART_TX_HANDLE, data, len, UART_TIMEOUT))
-  {
+#endif
+
+#if USART_USE_LL
+  while (len--) {
+    LL_USART_TransmitData8(UART_TX_HANDLE, *data++);
+    while (!LL_USART_IsActiveFlag_TXE(UART_TX_HANDLE))
+      ;
+  }
+  status = UART_OK;
+#else
+  if (HAL_OK == HAL_UART_Transmit(&UART_TX_HANDLE, data, len, UART_TIMEOUT)) {
     status = UART_OK;
   }
+#endif
   duplex_state_set(DUPLEX_RX);
-
   return status;
 }
+
+#if USART_USE_LL
+static void usart_hw_init(USART_TypeDef *USARTx, uint32_t dir) {
+  uint32_t pclk = SystemCoreClock / 2;
+#if defined(STM32F1)
+  LL_USART_SetBaudRate(USARTx, pclk, UART_BAUD);
+#else
+  LL_USART_SetBaudRate(USARTx, pclk, LL_USART_OVERSAMPLING_16, UART_BAUD);
+#endif
+  LL_USART_ConfigAsyncMode(USARTx);
+  USARTx->CR1 = USART_CR1_UE | dir; //| USART_CR1_RE | USART_CR1_TE;
+}
+#endif // USART_USE_LL
 
 /**
  * @brief UART Initialization Function
@@ -196,10 +208,13 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
  */
 void uart_init(void)
 {
-  /* Configure GPIO pins */
+#if !GPIO_USE_LL
   GPIO_InitTypeDef GPIO_InitStruct;
+#endif
 
+#if !USART_USE_LL
   memset(&huart1, 0, sizeof(huart1));
+#endif
 
 #ifdef DEBUG_UART
   debug_init();
@@ -219,6 +234,18 @@ void uart_init(void)
   __HAL_RCC_USART2_RELEASE_RESET();
   __HAL_RCC_USART2_CLK_ENABLE();
 
+#if GPIO_USE_LL
+  LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_6, LL_GPIO_MODE_ALTERNATE);
+  LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_6, LL_GPIO_SPEED_FREQ_HIGH);
+  LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_6, LL_GPIO_PULL_UP);
+  LL_GPIO_SetAFPin_0_7(GPIOB, LL_GPIO_PIN_6, LL_GPIO_AF_7);
+
+  LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_2, LL_GPIO_MODE_ALTERNATE);
+  LL_GPIO_SetPinOutputType(GPIOB, LL_GPIO_PIN_2, LL_GPIO_OUTPUT_PUSHPULL);
+  LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_2, LL_GPIO_SPEED_FREQ_HIGH);
+  LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_2, LL_GPIO_PULL_UP);
+  LL_GPIO_SetAFPin_0_7(GPIOB, LL_GPIO_PIN_2, LL_GPIO_AF_7);
+#else // !GPIO_USE_LL
   /* Init RX pin */
   GPIO_InitStruct.Pin = (1 << 6);
   GPIO_InitStruct.Pull = GPIO_PULLUP;
@@ -230,7 +257,14 @@ void uart_init(void)
   /* Init TX pin */
   GPIO_InitStruct.Pin = (1 << 2);
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+#endif // GPIO_USE_LL
 
+#if USART_USE_LL
+  usart_hw_init(USART2, USART_CR1_TE); // TX, half duplex
+  UART_handle = USART2;
+  usart_hw_init(USART1, USART_CR1_RE); // RX, half duplex
+  UART_TX_HANDLE = USART1;
+#else // !USART_USE_LL
   /* Init TX UART */
   huart_tx.Instance = USART2;
   huart_tx.Init.BaudRate = UART_BAUD;
@@ -252,11 +286,13 @@ void uart_init(void)
   if (HAL_HalfDuplex_Init(&huart1) != HAL_OK) {
     Error_Handler();
   }
+#endif // USART_USE_LL
 
 #else //!TARGET_GHOST_RX_V1_2
+  USART_TypeDef * uart_ptr;
 
 #if UART_NUM == 1
-  huart1.Instance = USART1;
+  uart_ptr = USART1;
 #if AFIO_USART1_ENABLE == 1
   GPIO_TypeDef *gpio_ptr = GPIOB;
   uint16_t pin_rx = 7;
@@ -272,7 +308,7 @@ void uart_init(void)
 #endif
 
 #elif UART_NUM == 2
-  huart1.Instance = USART2;
+  uart_ptr = USART2;
 #if AFIO_USART2_ENABLE == 1
   /* JTAG pins. Need remapping! */
   GPIO_TypeDef *gpio_ptr = GPIOA;
@@ -290,7 +326,7 @@ void uart_init(void)
 #endif
 
 #elif UART_NUM == 3 && defined(USART3)
-  huart1.Instance = USART3;
+  uart_ptr = USART3;
 
 #if AFIO_USART3_ENABLE == 1
   GPIO_TypeDef *gpio_ptr = GPIOB;
@@ -310,33 +346,78 @@ void uart_init(void)
 #error "Invalid UART config"
 #endif
 
-  if (huart1.Instance == USART1)
-  {
+  if (uart_ptr == USART1) {
     __HAL_RCC_USART1_FORCE_RESET();
     __HAL_RCC_USART1_RELEASE_RESET();
     __HAL_RCC_USART1_CLK_ENABLE();
-  }
-  else if (huart1.Instance == USART2)
-  {
+  } else if (uart_ptr == USART2) {
     __HAL_RCC_USART2_FORCE_RESET();
     __HAL_RCC_USART2_RELEASE_RESET();
     __HAL_RCC_USART2_CLK_ENABLE();
   }
 #if defined(USART3)
-  else if (huart1.Instance == USART3) {
+  else if (uart_ptr == USART3) {
     __HAL_RCC_USART3_FORCE_RESET();
     __HAL_RCC_USART3_RELEASE_RESET();
     __HAL_RCC_USART3_CLK_ENABLE();
   }
 #endif
 
+#if GPIO_USE_LL
+  pin_rx = 0x1 << pin_rx;
+  pin_tx = 0x1 << pin_tx;
+
+  /* RX pin */
+  LL_GPIO_SetPinSpeed(gpio_ptr, pin_rx, LL_GPIO_SPEED_FREQ_HIGH);
+  LL_GPIO_SetPinPull(gpio_ptr, pin_rx, LL_GPIO_PULL_UP);
+#if defined(STM32L0xx)
+  LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_ALTERNATE);
+  if (uart_ptr == USART1 && pin_rx == LL_GPIO_PIN_7) {
+    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_rx, LL_GPIO_AF_0);
+  } else if (pin_rx <= LL_GPIO_PIN_7) {
+    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_rx, LL_GPIO_AF_4);
+  } else {
+    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_rx, LL_GPIO_AF_4);
+  }
+#elif defined(STM32L4xx) || defined(STM32F3xx)
+  LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_ALTERNATE);
+  if (pin_rx <= LL_GPIO_PIN_7) {
+    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_rx, LL_GPIO_AF_7);
+  } else {
+    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_rx, LL_GPIO_AF_7);
+  }
+#else
+  LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_INPUT);
+#endif
+
+  /* TX pin */
+  LL_GPIO_SetPinMode(gpio_ptr, pin_tx, LL_GPIO_MODE_ALTERNATE);
+  LL_GPIO_SetPinSpeed(gpio_ptr, pin_tx, LL_GPIO_SPEED_FREQ_HIGH);
+  LL_GPIO_SetPinPull(gpio_ptr, pin_tx, LL_GPIO_PULL_UP);
+#if defined(STM32L0xx)
+  if (uart_ptr == USART1 && pin_tx == LL_GPIO_PIN_6) {
+    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_tx, LL_GPIO_AF_0);
+  } else if (pin_tx <= LL_GPIO_PIN_7) {
+    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_tx, LL_GPIO_AF_4);
+  } else {
+    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_tx, LL_GPIO_AF_4);
+  }
+#elif defined(STM32L4xx) || defined(STM32F3xx)
+  if (pin_tx <= LL_GPIO_PIN_7) {
+    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_tx, LL_GPIO_AF_7);
+  } else {
+    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_tx, LL_GPIO_AF_7);
+  }
+#endif
+
+#else // !GPIO_USE_LL
   /* RX pin */
   GPIO_InitStruct.Pin = (1 << pin_rx);
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 #if defined(STM32L0xx)
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  if (huart1.Instance == USART1 && pin_rx == 7) {
+  if (uart_ptr == USART1 && pin_rx == 7) {
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
   } else {
     GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
@@ -355,7 +436,7 @@ void uart_init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 #if defined(STM32L0xx)
-  if (huart1.Instance == USART1 && pin_tx == 6) {
+  if (uart_ptr == USART1 && pin_tx == 6) {
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
   } else {
     GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
@@ -364,9 +445,15 @@ void uart_init(void)
   GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
 #endif
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
+#endif // GPIO_USE_LL
 
   duplex_state_set(DUPLEX_RX);
 
+#if USART_USE_LL
+  UART_handle = uart_ptr;
+  usart_hw_init(uart_ptr, (USART_CR1_TE | USART_CR1_RE));
+#else // USART_USE_LL
+  huart1.Instance = uart_ptr;
   huart1.Init.BaudRate = UART_BAUD;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
@@ -383,5 +470,6 @@ void uart_init(void)
   {
     Error_Handler();
   }
+#endif // USART_USE_LL
 #endif // TARGET_GHOST_RX_V1_2
 }

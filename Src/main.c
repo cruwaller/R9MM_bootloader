@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 #include "main.h"
+#include "led.h"
 #include "uart.h"
 #include "flash.h"
 #if XMODEM
@@ -46,24 +47,36 @@
 #if defined(BUTTON_PIN)
 void *btn_port;
 uint16_t btn_pin;
+#else
+#define btn_port BTN_GPIO_Port
+#define btn_pin BTN_Pin
 #endif
 #if defined(LED_RED_PIN)
 void *led_red_port;
 uint16_t led_red_pin;
+#else
+#define led_red_port LED_RED_GPIO_Port
+#define led_red_pin LED_RED_Pin
 #endif
 #if defined(LED_GREEN_PIN)
 void *led_green_port;
 uint16_t led_green_pin;
+#else
+#define led_green_port LED_GRN_GPIO_Port
+#define led_green_pin LED_GRN_Pin
 #endif
 #if defined(DUPLEX_PIN)
 void *duplex_port;
 uint16_t duplex_pin;
+#else
+#define duplex_port DUPLEX_Port
+#define duplex_pin DUPLEX_Pin
 #endif
 
-#if defined(BUTTON_PIN)
+#if GPIO_USE_LL
+#define BTN_READ() LL_GPIO_IsInputPinSet(btn_port, btn_pin)
+#else
 #define BTN_READ() HAL_GPIO_ReadPin(btn_port, btn_pin)
-#elif defined(BTN_Pin)
-#define BTN_READ() HAL_GPIO_ReadPin(BTN_GPIO_Port, BTN_Pin)
 #endif
 #ifndef BUTTON_INVERTED
 #define BUTTON_INVERTED   1
@@ -77,11 +90,41 @@ static void MX_GPIO_Init(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
 {
-  *pin = io % 32;
+  *pin = io % 16;
   io = (io >> 8) - 'A';
   *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
 
-  // Enable clk??
+  // Enable gpio clock
+  switch(io) {
+    case 0:
+      __HAL_RCC_GPIOA_CLK_ENABLE();
+      break;
+    case 1:
+      __HAL_RCC_GPIOB_CLK_ENABLE();
+      break;
+#ifdef __HAL_RCC_GPIOC_CLK_ENABLE
+    case 2:
+      __HAL_RCC_GPIOC_CLK_ENABLE();
+      break;
+#endif
+#ifdef __HAL_RCC_GPIOD_CLK_ENABLE
+    case 3:
+      __HAL_RCC_GPIOD_CLK_ENABLE();
+      break;
+#endif
+#ifdef __HAL_RCC_GPIOE_CLK_ENABLE
+    case 4:
+      __HAL_RCC_GPIOE_CLK_ENABLE();
+      break;
+#endif
+#ifdef __HAL_RCC_GPIOF_CLK_ENABLE
+    case 5:
+      __HAL_RCC_GPIOF_CLK_ENABLE();
+      break;
+#endif
+    default:
+      break;
+    }
 }
 
 void led_red_state_set(const GPIO_PinState state)
@@ -92,6 +135,7 @@ void led_red_state_set(const GPIO_PinState state)
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);
 #else
   (void)state;
+  ws2812_set_color(255, 0, 0);
 #endif
 }
 
@@ -103,6 +147,7 @@ void led_green_state_set(const GPIO_PinState state)
   HAL_GPIO_WritePin(LED_GRN_GPIO_Port, LED_GRN_Pin, state);
 #else
   (void)state;
+  ws2812_set_color(0, 255, 0);
 #endif
 }
 
@@ -127,20 +172,19 @@ static void boot_code(void)
   led_green_state_set(1);
 
   /* Send welcome message on startup. */
-  uart_transmit_str((uint8_t *)"\n\r==========================================\n\r");
-  uart_transmit_str((uint8_t *)"  UART Bootloader for ExpressLRS\n\r");
-  uart_transmit_str((uint8_t *)"  https://github.com/AlessandroAU/ExpressLRS\n\r");
-  uart_transmit_str((uint8_t *)"==========================================\n\r\n\r");
+  uart_transmit_str((uint8_t *)"\n\r=========================\n\r");
+  uart_transmit_str((uint8_t *)"  ExpressLRS bootloader\n\r");
+  uart_transmit_str((uint8_t *)"=========================\n\r");
 #if defined(MCU_TYPE)
   uart_transmit_str((uint8_t *)BUILD_MCU_TYPE(MCU_TYPE));
   uart_transmit_str((uint8_t *)"\n\r");
 #endif
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
-  uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button to begin bootloader\n\r");
+  uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
 
-#if defined(BTN_READ) && BUTTON_NEW_BOUNCE
-  GPIO_PinState btn_val = BTN_READ();
+#if defined(BUTTON) && BUTTON_NEW_BOUNCE
+  uint32_t btn_val = BTN_READ();
 #endif
 
   /* Wait input from UART */
@@ -151,12 +195,11 @@ static void boot_code(void)
   {
     BLrequested = true;
   }
-#if defined(BTN_READ)
+#if defined(BUTTON)
 #if BUTTON_NEW_BOUNCE
   // Debounce check (1sec)
   else if (BTN_READ() == btn_val && (btn_val ^ BUTTON_INVERTED) == GPIO_PIN_SET) {
     // Button value is still same and is pressed
-    uart_transmit_str((uint8_t *)"Button press\n\r");
     BLrequested = true;
   }
 #else // !BUTTON_NEW_BOUNCE
@@ -164,13 +207,12 @@ static void boot_code(void)
   if (!BLrequested) // Check UART if not button not pressed
     for (int i = 0; i < 2; i++)
     {
-      if (BTN_READ() == GPIO_PIN_RESET)
+      if ((BTN_READ() ^ BUTTON_INVERTED) == GPIO_PIN_SET)
       {
         HAL_Delay(100); // wait debounce
-        if (BTN_READ() == GPIO_PIN_RESET)
+        if ((BTN_READ() ^ BUTTON_INVERTED) == GPIO_PIN_SET)
         {
           // Button still pressed
-          uart_transmit_str((uint8_t *)"Button press\n\r");
           BLrequested = true;
           break;
         }
@@ -181,7 +223,7 @@ static void boot_code(void)
       }
     }
 #endif /* BUTTON_NEW_BOUNCE */
-#endif /* BTN_READ */
+#endif /* BUTTON */
 
   if (BLrequested == true)
   {
@@ -195,7 +237,7 @@ static void boot_code(void)
      * it's own purpose, thus if RED stays on there is an error */
     led_red_state_set(1);
     led_green_state_set(0);
-    uart_transmit_str((uint8_t *)"Start app\n\r");
+    //uart_transmit_str((uint8_t *)"Start app\n\r");
     flash_jump_to_app();
   }
 
@@ -327,8 +369,8 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 #if defined(STM32L4xx)
   uint32_t flash_latency = FLASH_LATENCY_4;
 #else // !STM32L4xx
@@ -376,7 +418,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
     Error_Handler();
@@ -405,41 +447,41 @@ static void MX_GPIO_Init(void)
 #if defined(BTN_Pin)     || defined(LED_GRN_Pin) || defined(LED_RED_Pin)   || \
     defined(DUPLEX_Pin)  || defined(BUTTON_PIN)  || defined(LED_GREEN_PIN) || \
     defined(LED_RED_PIN) || defined(DUPLEX_PIN)
+#if !GPIO_USE_LL
   GPIO_InitTypeDef GPIO_InitStruct;
 #endif
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-#if !defined(TARGET_RAK4200)
-#ifdef __HAL_RCC_GPIOC_CLK_ENABLE
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-#endif
-#ifdef __HAL_RCC_GPIOD_CLK_ENABLE
-  __HAL_RCC_GPIOD_CLK_ENABLE();
-#endif
 #endif
 
+#ifdef BUTTON
 #if defined(BUTTON_PIN)
   gpio_port_pin_get(CREATE_IO(BUTTON_PIN), &btn_port, &btn_pin);
+#endif
+#if GPIO_USE_LL
+  LL_GPIO_SetPinMode(btn_port, btn_pin, LL_GPIO_MODE_INPUT);
+  LL_GPIO_SetPinSpeed(btn_port, btn_pin, LL_GPIO_SPEED_FREQ_LOW);
+  LL_GPIO_SetPinPull(btn_port, btn_pin,
+                     BUTTON_INVERTED ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN);
+#else // GPIO_USE_LL
   /*Configure GPIO pin : BTN_Pin */
   GPIO_InitStruct.Pin = btn_pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = BUTTON_INVERTED ? GPIO_PULLUP : GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(btn_port, &GPIO_InitStruct);
+#endif // GPIO_USE_LL
+#endif // BUTTON
 
-#elif defined(BTN_Pin) && defined(BTN_GPIO_Port)
-  /*Configure GPIO pin : BTN_Pin */
-  GPIO_InitStruct.Pin = BTN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = BUTTON_INVERTED ? GPIO_PULLUP : GPIO_PULLDOWN;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(BTN_GPIO_Port, &GPIO_InitStruct);
-#endif
-
+#ifdef LED_GRN
 #if defined(LED_GREEN_PIN)
   gpio_port_pin_get(CREATE_IO(LED_GREEN_PIN), &led_green_port, &led_green_pin);
+#endif
+#if GPIO_USE_LL
+  LL_GPIO_SetPinMode(led_green_port, led_green_pin, LL_GPIO_MODE_OUTPUT);
+  LL_GPIO_SetPinOutputType(led_green_port, led_green_pin,
+                           LL_GPIO_OUTPUT_PUSHPULL);
+  LL_GPIO_SetPinSpeed(led_green_port, led_green_pin, LL_GPIO_SPEED_FREQ_LOW);
+  LL_GPIO_ResetOutputPin(led_green_port, led_green_pin);
+#else // GPIO_USE_LL
   GPIO_InitStruct.Pin = led_green_pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -447,19 +489,19 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(led_green_port, &GPIO_InitStruct);
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(led_green_port, led_green_pin, GPIO_PIN_RESET);
-#elif defined(LED_GRN_Pin) && defined(LED_GRN_GPIO_Port)
-  /*Configure GPIO pin : LED_GRN_Pin */
-  GPIO_InitStruct.Pin = LED_GRN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_GRN_GPIO_Port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GRN_GPIO_Port, LED_GRN_Pin, GPIO_PIN_RESET);
-#endif
+#endif // GPIO_USE_LL
+#endif // LED_GRN
 
+#ifdef LED_RED
 #if defined(LED_RED_PIN)
   gpio_port_pin_get(CREATE_IO(LED_RED_PIN), &led_red_port, &led_red_pin);
+#endif
+#if GPIO_USE_LL
+  LL_GPIO_SetPinMode(led_red_port, led_red_pin, LL_GPIO_MODE_OUTPUT);
+  LL_GPIO_SetPinOutputType(led_red_port, led_red_pin, LL_GPIO_OUTPUT_PUSHPULL);
+  LL_GPIO_SetPinSpeed(led_red_port, led_red_pin, LL_GPIO_SPEED_FREQ_LOW);
+  LL_GPIO_ResetOutputPin(led_red_port, led_red_pin);
+#else // GPIO_USE_LL
   GPIO_InitStruct.Pin = led_red_pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -467,19 +509,19 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(led_red_port, &GPIO_InitStruct);
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(led_red_port, led_red_pin, GPIO_PIN_RESET);
-#elif defined(LED_RED_Pin) && defined(LED_RED_GPIO_Port)
-  /*Configure GPIO pin : LED_RED_Pin */
-  GPIO_InitStruct.Pin = LED_RED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_RED_GPIO_Port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-#endif
+#endif // GPIO_USE_LL
+#endif // LED_RED
 
+#if TARGET_R9M
 #if defined(DUPLEX_PIN)
   gpio_port_pin_get(CREATE_IO(DUPLEX_PIN), &duplex_port, &duplex_pin);
+#endif
+#if GPIO_USE_LL
+  LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);
+  LL_GPIO_SetPinOutputType(duplex_port, duplex_pin, LL_GPIO_OUTPUT_PUSHPULL);
+  LL_GPIO_SetPinSpeed(duplex_port, duplex_pin, LL_GPIO_SPEED_FREQ_LOW);
+  LL_GPIO_ResetOutputPin(duplex_port, duplex_pin);
+#else // GPIO_USE_LL
   GPIO_InitStruct.Pin = duplex_pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -487,16 +529,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(duplex_port, &GPIO_InitStruct);
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(duplex_port, duplex_pin, GPIO_PIN_RESET);
-#elif defined(DUPLEX_Pin) && defined(DUPLEX_Port)
-  /* Configure GPIO pin : DUPLEX_Pin */
-  GPIO_InitStruct.Pin = DUPLEX_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(DUPLEX_Port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(DUPLEX_Port, DUPLEX_Pin, GPIO_PIN_RESET);
-#endif
+#endif // GPIO_USE_LL
+#endif // TARGET_R9M
+
+  ws2812_init();
 }
 
 /**
