@@ -134,7 +134,7 @@ uint8_t check_crc(const uint8_t first)
 
 void process_frame(const uint8_t first)
 {
-#ifdef DEBUG_UART
+#if defined(DEBUG_UART) && defined(STM32F1)
     //for (int iter = 0; iter < 8; iter++)
     //    debug_send(frame[iter]);
 #endif
@@ -250,7 +250,7 @@ exit_read:
 
 int8_t frsky_check(void)
 {
-    uint8_t led_state = 1, gled = 1;
+    uint8_t led_state = 1;
     uint8_t data;
 
     while (1)
@@ -260,9 +260,8 @@ int8_t frsky_check(void)
         {
             if (INVERT(data) == START_STOP)
             {
-                led_green_state_set(gled);
-                gled ^= 1;
-
+                led_state_set(led_state ? LED_FLASHING : LED_FLASHING_ALT);
+                led_state ^= 1;
                 /* frame start detected capture rest and process */
                 readFrame();
             }
@@ -274,11 +273,6 @@ int8_t frsky_check(void)
         else if (!flash_ongoing && timer_end())
         {
             goto exit_frsky;
-        }
-        else
-        {
-            led_red_state_set(led_state);
-            led_state ^= 1;
         }
     }
 

@@ -52,8 +52,7 @@ void xmodem_receive(void) {
      * we want to use CRC-16. */
     if ((UART_OK != comm_status) && (false == x_first_packet_received)) {
       (void)uart_transmit_ch(X_C);
-      led_red_state_set(ledState);
-      led_green_state_set(!ledState);
+      led_state_set(ledState ? LED_FLASHING : LED_FLASHING_ALT);
       ledState = !ledState;
     }
     /* Uart timeout or any other errors. */
@@ -119,8 +118,7 @@ static uint16_t xmodem_calc_crc(uint8_t *data, uint16_t length) {
   uint16_t crc = 0u;
 
   if (flashcounter % 5 == 0) {
-    led_red_state_set(ledState);
-    led_green_state_set(!ledState);
+    led_state_set(ledState ? LED_FLASHING : LED_FLASHING_ALT);
     ledState = !ledState;
   }
   flashcounter++;

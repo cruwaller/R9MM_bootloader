@@ -68,17 +68,39 @@ enum duplex_state
   DUPLEX_TX,
 };
 
-#define CREATE_IO_IMPL(port, pin) (((port) << 8) + pin)
-#define CREATE_IO(...) CREATE_IO_IMPL(__VA_ARGS__)
+#define IO_CREATE_IMPL(port, pin) (((port) << 8) + pin)
+#define IO_CREATE(...)  IO_CREATE_IMPL(__VA_ARGS__)
+#define IO_GET_PORT(_p) (((_p) >> 8) - 'A')
+#define IO_GET_PIN(_p)  ((_p) % 16)
+
+enum led_states
+{
+  LED_OFF,
+  LED_BOOTING,
+  LED_FLASHING,
+  LED_FLASHING_ALT,
+  LED_STARTING,
+};
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
-void led_red_state_set(const GPIO_PinState state);
-void led_green_state_set(const GPIO_PinState state);
+void led_state_set(uint32_t state);
 void duplex_state_set(const enum duplex_state state);
 int8_t timer_end(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin);
+
+#if GPIO_USE_LL
+static inline void GPIO_WritePin(GPIO_TypeDef *GPIOx, uint16_t pin, uint8_t state)
+{
+  if (state)
+    LL_GPIO_SetOutputPin(GPIOx, pin);
+  else
+    LL_GPIO_ResetOutputPin(GPIOx, pin);
+}
+#else
+#define GPIO_WritePin(...) HAL_GPIO_WritePin(__VA_ARGS__)
+#endif
 
 /* Private defines -----------------------------------------------------------*/
 #if !defined(XMODEM) && !STK500 && !FRSKY

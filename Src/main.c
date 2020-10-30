@@ -90,8 +90,8 @@ static void MX_GPIO_Init(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
 {
-  *pin = io % 16;
-  io = (io >> 8) - 'A';
+  *pin = IO_GET_PIN(io);
+  io = IO_GET_PORT(io);
   *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
 
   // Enable gpio clock
@@ -127,36 +127,40 @@ void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
     }
 }
 
-void led_red_state_set(const GPIO_PinState state)
+void led_state_set(uint32_t state)
 {
-#if defined(LED_RED_PIN)
-  HAL_GPIO_WritePin(led_red_port, led_red_pin, state);
-#elif defined(LED_RED_Pin) && defined(LED_RED_GPIO_Port)
-  HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);
-#else
-  (void)state;
-  ws2812_set_color(255, 0, 0);
-#endif
-}
+  uint32_t val;
+  switch (state) {
+  case LED_BOOTING:
+    val = 0x00ffff;
+    break;
+  case LED_FLASHING:
+    val = 0x00ffff;
+    break;
+  case LED_FLASHING_ALT:
+    val = 0x00ff00;
+    break;
+  case LED_STARTING:
+    val = 0xffff00;
+    break;
+  case LED_OFF:
+  default:
+    val = 0x0;
+  };
 
-void led_green_state_set(const GPIO_PinState state)
-{
-#if defined(LED_GREEN_PIN)
-  HAL_GPIO_WritePin(led_green_port, led_green_pin, state);
-#elif defined(LED_GRN_Pin) && defined(LED_GRN_GPIO_Port)
-  HAL_GPIO_WritePin(LED_GRN_GPIO_Port, LED_GRN_Pin, state);
-#else
-  (void)state;
-  ws2812_set_color(0, 255, 0);
+#if defined(LED_RED)
+  GPIO_WritePin(led_red_port, led_red_pin, !!(uint8_t)val);
 #endif
+#if defined(LED_GREEN)
+  GPIO_WritePin(led_green_port, led_green_pin, !!(uint8_t)(val >> 8));
+#endif
+  ws2812_set_color((uint8_t)(val), (uint8_t)(val >> 8), (uint8_t)(val >> 16));
 }
 
 void duplex_state_set(const enum duplex_state state)
 {
-#if defined(DUPLEX_PIN)
-  HAL_GPIO_WritePin(duplex_port, duplex_pin, (state == DUPLEX_TX));
-#elif defined(DUPLEX_Pin) && defined(DUPLEX_Port)
-  HAL_GPIO_WritePin(DUPLEX_Port, DUPLEX_Pin, (state == DUPLEX_TX));
+#if TARGET_R9M
+  GPIO_WritePin(duplex_port, duplex_pin, (state == DUPLEX_TX));
 #else
   (void)state;
 #endif
@@ -167,9 +171,6 @@ static void boot_code(void)
 {
   bool BLrequested = false;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
-
-  led_red_state_set(1);
-  led_green_state_set(1);
 
   /* Send welcome message on startup. */
   uart_transmit_str((uint8_t *)"\n\r=========================\n\r");
@@ -225,19 +226,11 @@ static void boot_code(void)
 #endif /* BUTTON_NEW_BOUNCE */
 #endif /* BUTTON */
 
-  if (BLrequested == true)
-  {
-    /* BL was requested, GRN led on */
-    led_red_state_set(0);
-    led_green_state_set(1);
-  }
-  else
+  if (!BLrequested)
   {
     /* BL was not requested, RED led on. Use app will soon use the LED's for
      * it's own purpose, thus if RED stays on there is an error */
-    led_red_state_set(1);
-    led_green_state_set(0);
-    //uart_transmit_str((uint8_t *)"Start app\n\r");
+    // uart_transmit_str((uint8_t *)"Start app\n\r");
     flash_jump_to_app();
   }
 
@@ -280,8 +273,6 @@ static void boot_code(void)
     )
     {
       flash_jump_to_app();
-      while (1)
-        ;
     }
   }
 }
@@ -313,6 +304,7 @@ int main(void)
 
   uart_init();
 
+  led_state_set(LED_BOOTING);
   boot_code();
 }
 
@@ -454,7 +446,7 @@ static void MX_GPIO_Init(void)
 
 #ifdef BUTTON
 #if defined(BUTTON_PIN)
-  gpio_port_pin_get(CREATE_IO(BUTTON_PIN), &btn_port, &btn_pin);
+  gpio_port_pin_get(IO_CREATE(BUTTON_PIN), &btn_port, &btn_pin);
 #endif
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(btn_port, btn_pin, LL_GPIO_MODE_INPUT);
@@ -473,7 +465,7 @@ static void MX_GPIO_Init(void)
 
 #ifdef LED_GRN
 #if defined(LED_GREEN_PIN)
-  gpio_port_pin_get(CREATE_IO(LED_GREEN_PIN), &led_green_port, &led_green_pin);
+  gpio_port_pin_get(IO_CREATE(LED_GREEN_PIN), &led_green_port, &led_green_pin);
 #endif
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_green_port, led_green_pin, LL_GPIO_MODE_OUTPUT);
@@ -494,7 +486,7 @@ static void MX_GPIO_Init(void)
 
 #ifdef LED_RED
 #if defined(LED_RED_PIN)
-  gpio_port_pin_get(CREATE_IO(LED_RED_PIN), &led_red_port, &led_red_pin);
+  gpio_port_pin_get(IO_CREATE(LED_RED_PIN), &led_red_port, &led_red_pin);
 #endif
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_red_port, led_red_pin, LL_GPIO_MODE_OUTPUT);
@@ -514,7 +506,7 @@ static void MX_GPIO_Init(void)
 
 #if TARGET_R9M
 #if defined(DUPLEX_PIN)
-  gpio_port_pin_get(CREATE_IO(DUPLEX_PIN), &duplex_port, &duplex_pin);
+  gpio_port_pin_get(IO_CREATE(DUPLEX_PIN), &duplex_port, &duplex_pin);
 #endif
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);

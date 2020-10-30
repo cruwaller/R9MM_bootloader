@@ -30,7 +30,7 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len);
 
 void uart_init(void);
 
-#ifdef DEBUG_UART
+#if defined(DEBUG_UART) && defined(STM32F1)
 void debug_send(uint8_t data);
 #else
 #define debug_send(data)

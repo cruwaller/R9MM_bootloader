@@ -85,7 +85,7 @@ static void ws2812_send_color(uint8_t const *const RGB) // takes RGB data
 void ws2812_init(void)
 {
 #if defined(WS2812_LED_PIN)
-    gpio_port_pin_get(CREATE_IO(WS2812_LED_PIN), &ws2812_port, &ws2812_pin);
+    gpio_port_pin_get(IO_CREATE(WS2812_LED_PIN), &ws2812_port, &ws2812_pin);
 #endif
 #if GPIO_USE_LL
     LL_GPIO_SetPinMode(ws2812_port, ws2812_pin, LL_GPIO_MODE_OUTPUT);
@@ -98,7 +98,6 @@ void ws2812_init(void)
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    gpio_port_pin_get(CREATE_IO(WS2812_LED_PIN), &ws2812_port, &ws2812_pin);
     GPIO_InitStruct.Pin = ws2812_pin;
     HAL_GPIO_Init(ws2812_port, &GPIO_InitStruct);
 #endif // GPIO_USE_LL
@@ -110,7 +109,4 @@ void ws2812_set_color(uint8_t const r, uint8_t const g, uint8_t const b)
     ws2812_send_color(data);
 }
 
-#else
-void ws2812_init(void) {}
-void ws2812_set_color(uint8_t const r, uint8_t const g, uint8_t const b) {}
 #endif /* WS2812_RED */

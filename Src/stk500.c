@@ -52,7 +52,6 @@ static int8_t stk500_update(void)
   int8_t initial_sync = 0;
 
   insync = 0;
-  led_red_state_set(led);
 
   for (retval = 0; retval == 0;)
   {
@@ -71,13 +70,12 @@ static int8_t stk500_update(void)
       return -1;
 
     led ^= 1;
-    led_red_state_set(led);
+    led_state_set(led ? LED_FLASHING : LED_FLASHING_ALT);
 
     if (ch == STK_GET_SYNC)
     {
       verifySpace();
       if (insync) {
-        led_green_state_set(1);
         initial_sync = 1;
       }
     }

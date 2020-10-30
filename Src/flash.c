@@ -249,6 +249,8 @@ flash_status flash_write_halfword(uint32_t address, uint16_t *data,
  */
 void flash_jump_to_app(void)
 {
+  led_state_set(LED_STARTING);
+
   /* Function pointer to the address of the user application. */
   volatile fnc_ptr jump_to_app;
   jump_to_app = (fnc_ptr)(*(volatile uint32_t *)(FLASH_APP_START_ADDRESS + 4u));
@@ -262,4 +264,7 @@ void flash_jump_to_app(void)
   __set_MSP(*(volatile uint32_t *)FLASH_APP_START_ADDRESS);
 #endif
   jump_to_app();
+
+  while(1)
+    ;
 }
