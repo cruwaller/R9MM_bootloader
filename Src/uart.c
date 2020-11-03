@@ -299,15 +299,15 @@ void uart_init(void)
 
 #if UART_NUM == 1
   uart_ptr = USART1;
-#if AFIO_USART1_ENABLE == 1
+#if UART_AFIO == 1
   gpio_ptr = GPIOB;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_7 : GPIO_PIN_7);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_6 : GPIO_PIN_6);
-#elif AFIO_USART1_ENABLE == 2
+#elif UART_AFIO == 2
   gpio_ptr = GPIOC;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_5 : GPIO_PIN_5);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4);
-#else
+#else // !UART_AFIO
   gpio_ptr = GPIOA;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_9 : GPIO_PIN_9);
@@ -315,17 +315,17 @@ void uart_init(void)
 
 #elif UART_NUM == 2
   uart_ptr = USART2;
-#if AFIO_USART2_ENABLE == 1
+#if UART_AFIO == 1
   /* JTAG pins. Need remapping! */
   gpio_ptr = GPIOA;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_15 : GPIO_PIN_15);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_14 : GPIO_PIN_14);
-#elif AFIO_USART2_ENABLE == 2
+#elif UART_AFIO == 2
   /* JTAG pins. Need remapping! */
   gpio_ptr = GPIOB;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3);
-#else //! AFIO_USART2_ENABLE
+#else // !UART_AFIO
   gpio_ptr = GPIOA;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_2 : GPIO_PIN_2);
@@ -334,15 +334,15 @@ void uart_init(void)
 #elif UART_NUM == 3 && defined(USART3)
   uart_ptr = USART3;
 
-#if AFIO_USART3_ENABLE == 1
+#if UART_AFIO == 1
   gpio_ptr = GPIOB;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_8 : GPIO_PIN_8);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_9 : GPIO_PIN_9);
-#elif AFIO_USART3_ENABLE == 2
+#elif UART_AFIO == 2
   gpio_ptr = GPIOC;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
-#else
+#else // !UART_AFIO
   gpio_ptr = GPIOB;
   pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11);
   pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
