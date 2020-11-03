@@ -178,6 +178,8 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
     while (!LL_USART_IsActiveFlag_TXE(UART_TX_HANDLE))
       ;
   }
+  while (!LL_USART_IsActiveFlag_TC(UART_TX_HANDLE))
+    ;
   status = UART_OK;
 #else
   if (HAL_OK == HAL_UART_Transmit(&UART_TX_HANDLE, data, len, UART_TIMEOUT)) {
