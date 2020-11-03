@@ -4,7 +4,7 @@
 #if defined(WS2812_LED_PIN) || (defined(WS2812_LED_Port) && defined(WS2812_LED_Pin))
 #if defined(WS2812_LED_PIN)
 static void *ws2812_port;
-static uint16_t ws2812_pin;
+static uint32_t ws2812_pin;
 #else  // !WS2812_LED_PIN
 #define ws2812_port WS2812_LED_Port
 #define ws2812_pin WS2812_LED_Pin

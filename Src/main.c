@@ -46,28 +46,28 @@
 
 #if defined(BUTTON_PIN)
 void *btn_port;
-uint16_t btn_pin;
+uint32_t btn_pin;
 #else
 #define btn_port BTN_GPIO_Port
 #define btn_pin BTN_Pin
 #endif
 #if defined(LED_RED_PIN)
 void *led_red_port;
-uint16_t led_red_pin;
+uint32_t led_red_pin;
 #else
 #define led_red_port LED_RED_GPIO_Port
 #define led_red_pin LED_RED_Pin
 #endif
 #if defined(LED_GREEN_PIN)
 void *led_green_port;
-uint16_t led_green_pin;
+uint32_t led_green_pin;
 #else
 #define led_green_port LED_GRN_GPIO_Port
 #define led_green_pin LED_GRN_Pin
 #endif
 #if defined(DUPLEX_PIN)
 void *duplex_port;
-uint16_t duplex_pin;
+uint32_t duplex_pin;
 #else
 #define duplex_port DUPLEX_Port
 #define duplex_pin DUPLEX_Pin
@@ -88,37 +88,44 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 
-void gpio_port_pin_get(uint32_t io, void ** port, uint16_t * pin)
+void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin)
 {
-  *pin = IO_GET_PIN(io);
+  uint32_t _pin = 0x1 << IO_GET_PIN(io);
+#if defined(STM32F1) && defined(GPIO_PIN_MASK_POS)
+  _pin = (_pin << GPIO_PIN_MASK_POS) | ((_pin < 0x100) ? _pin : (0x04000000 | (0x1 << (_pin - 8))));
+#endif
+  *pin = _pin;
   io = IO_GET_PORT(io);
   *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
+}
 
+void gpio_port_clock(uint32_t port)
+{
   // Enable gpio clock
-  switch(io) {
-    case 0:
+  switch (port) {
+    case GPIOA_BASE:
       __HAL_RCC_GPIOA_CLK_ENABLE();
       break;
-    case 1:
+    case GPIOB_BASE:
       __HAL_RCC_GPIOB_CLK_ENABLE();
       break;
 #ifdef __HAL_RCC_GPIOC_CLK_ENABLE
-    case 2:
+    case GPIOC_BASE:
       __HAL_RCC_GPIOC_CLK_ENABLE();
       break;
 #endif
 #ifdef __HAL_RCC_GPIOD_CLK_ENABLE
-    case 3:
+    case GPIOD_BASE:
       __HAL_RCC_GPIOD_CLK_ENABLE();
       break;
 #endif
 #ifdef __HAL_RCC_GPIOE_CLK_ENABLE
-    case 4:
+    case GPIOE_BASE:
       __HAL_RCC_GPIOE_CLK_ENABLE();
       break;
 #endif
 #ifdef __HAL_RCC_GPIOF_CLK_ENABLE
-    case 5:
+    case GPIOF_BASE:
       __HAL_RCC_GPIOF_CLK_ENABLE();
       break;
 #endif
@@ -151,7 +158,7 @@ void led_state_set(uint32_t state)
 #if defined(LED_RED)
   GPIO_WritePin(led_red_port, led_red_pin, !!(uint8_t)val);
 #endif
-#if defined(LED_GREEN)
+#if defined(LED_GRN)
   GPIO_WritePin(led_green_port, led_green_pin, !!(uint8_t)(val >> 8));
 #endif
   ws2812_set_color((uint8_t)(val), (uint8_t)(val >> 8), (uint8_t)(val >> 16));
@@ -185,7 +192,7 @@ static void boot_code(void)
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
 
 #if defined(BUTTON) && BUTTON_NEW_BOUNCE
-  uint32_t btn_val = BTN_READ();
+  uint32_t btn_val = !!BTN_READ();
 #endif
 
   /* Wait input from UART */
@@ -199,7 +206,7 @@ static void boot_code(void)
 #if defined(BUTTON)
 #if BUTTON_NEW_BOUNCE
   // Debounce check (1sec)
-  else if (BTN_READ() == btn_val && (btn_val ^ BUTTON_INVERTED) == GPIO_PIN_SET) {
+  else if (!!BTN_READ() == btn_val && (btn_val ^ BUTTON_INVERTED) == 1) {
     // Button value is still same and is pressed
     BLrequested = true;
   }
@@ -208,10 +215,10 @@ static void boot_code(void)
   if (!BLrequested) // Check UART if not button not pressed
     for (int i = 0; i < 2; i++)
     {
-      if ((BTN_READ() ^ BUTTON_INVERTED) == GPIO_PIN_SET)
+      if ((!!BTN_READ() ^ BUTTON_INVERTED) == 1)
       {
         HAL_Delay(100); // wait debounce
-        if ((BTN_READ() ^ BUTTON_INVERTED) == GPIO_PIN_SET)
+        if ((!!BTN_READ() ^ BUTTON_INVERTED) == 1)
         {
           // Button still pressed
           BLrequested = true;
@@ -321,10 +328,10 @@ void SystemClock_Config(void)
   memset(&RCC_OscInitStruct, 0, sizeof(RCC_OscInitTypeDef));
   memset(&RCC_ClkInitStruct, 0, sizeof(RCC_ClkInitTypeDef));
 
-#if defined(STM32L0xx) || defined(STM32L4xx)
   /* Enable Power Control clock */
   __HAL_RCC_PWR_CLK_ENABLE();
 
+#if defined(STM32L0xx) || defined(STM32L4xx)
   /* The voltage scaling allows optimizing the power consumption when the device is
      clocked below the maximum system frequency, to update the voltage scaling value
      regarding system frequency refer to product datasheet.  */
@@ -423,6 +430,10 @@ void SystemClock_Config(void)
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
     Error_Handler();
   }
+#else
+  __HAL_RCC_AFIO_CLK_ENABLE();
+  /** NOJTAG: JTAG-DP Disabled and SW-DP Enabled */
+  __HAL_AFIO_REMAP_SWJ_NOJTAG();
 #endif
 #endif
 
@@ -448,9 +459,9 @@ static void MX_GPIO_Init(void)
 #if defined(BUTTON_PIN)
   gpio_port_pin_get(IO_CREATE(BUTTON_PIN), &btn_port, &btn_pin);
 #endif
+  gpio_port_clock((uint32_t)btn_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(btn_port, btn_pin, LL_GPIO_MODE_INPUT);
-  LL_GPIO_SetPinSpeed(btn_port, btn_pin, LL_GPIO_SPEED_FREQ_LOW);
   LL_GPIO_SetPinPull(btn_port, btn_pin,
                      BUTTON_INVERTED ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN);
 #else // GPIO_USE_LL
@@ -467,10 +478,10 @@ static void MX_GPIO_Init(void)
 #if defined(LED_GREEN_PIN)
   gpio_port_pin_get(IO_CREATE(LED_GREEN_PIN), &led_green_port, &led_green_pin);
 #endif
+  gpio_port_clock((uint32_t)led_green_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_green_port, led_green_pin, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(led_green_port, led_green_pin,
-                           LL_GPIO_OUTPUT_PUSHPULL);
+  LL_GPIO_SetPinOutputType(led_green_port, led_green_pin, LL_GPIO_OUTPUT_PUSHPULL);
   LL_GPIO_SetPinSpeed(led_green_port, led_green_pin, LL_GPIO_SPEED_FREQ_LOW);
   LL_GPIO_ResetOutputPin(led_green_port, led_green_pin);
 #else // GPIO_USE_LL
@@ -488,6 +499,7 @@ static void MX_GPIO_Init(void)
 #if defined(LED_RED_PIN)
   gpio_port_pin_get(IO_CREATE(LED_RED_PIN), &led_red_port, &led_red_pin);
 #endif
+  gpio_port_clock((uint32_t)led_red_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_red_port, led_red_pin, LL_GPIO_MODE_OUTPUT);
   LL_GPIO_SetPinOutputType(led_red_port, led_red_pin, LL_GPIO_OUTPUT_PUSHPULL);
@@ -508,6 +520,7 @@ static void MX_GPIO_Init(void)
 #if defined(DUPLEX_PIN)
   gpio_port_pin_get(IO_CREATE(DUPLEX_PIN), &duplex_port, &duplex_pin);
 #endif
+  gpio_port_clock((uint32_t)duplex_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);
   LL_GPIO_SetPinOutputType(duplex_port, duplex_pin, LL_GPIO_OUTPUT_PUSHPULL);

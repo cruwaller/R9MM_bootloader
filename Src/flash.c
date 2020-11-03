@@ -252,7 +252,7 @@ void flash_jump_to_app(void)
   led_state_set(LED_STARTING);
 
   /* Function pointer to the address of the user application. */
-  volatile fnc_ptr jump_to_app;
+  fnc_ptr jump_to_app;
   jump_to_app = (fnc_ptr)(*(volatile uint32_t *)(FLASH_APP_START_ADDRESS + 4u));
   /* Remove configs before jump. */
   HAL_DeInit();

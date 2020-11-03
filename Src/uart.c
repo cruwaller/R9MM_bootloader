@@ -234,6 +234,8 @@ void uart_init(void)
   __HAL_RCC_USART2_RELEASE_RESET();
   __HAL_RCC_USART2_CLK_ENABLE();
 
+  gpio_port_clock((uint32_t)GPIOB);
+  gpio_port_clock((uint32_t)GPIOA);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_6, LL_GPIO_MODE_ALTERNATE);
   LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_6, LL_GPIO_SPEED_FREQ_HIGH);
@@ -247,7 +249,7 @@ void uart_init(void)
   LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_2, LL_GPIO_AF_7);
 #else // !GPIO_USE_LL
   /* Init RX pin */
-  GPIO_InitStruct.Pin = (1 << 6);
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -255,7 +257,7 @@ void uart_init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* Init TX pin */
-  GPIO_InitStruct.Pin = (1 << 2);
+  GPIO_InitStruct.Pin = GPIO_PIN_2;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 #endif // GPIO_USE_LL
 
@@ -290,56 +292,58 @@ void uart_init(void)
 
 #else //!TARGET_GHOST_RX_V1_2
   USART_TypeDef * uart_ptr;
+  GPIO_TypeDef *gpio_ptr;
+  uint32_t pin_rx, pin_tx;
 
 #if UART_NUM == 1
   uart_ptr = USART1;
 #if AFIO_USART1_ENABLE == 1
-  GPIO_TypeDef *gpio_ptr = GPIOB;
-  uint16_t pin_rx = 7;
-  uint16_t pin_tx = 6;
+  gpio_ptr = GPIOB;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_7 : GPIO_PIN_7);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_6 : GPIO_PIN_6);
 #elif AFIO_USART1_ENABLE == 2
-  GPIO_TypeDef *gpio_ptr = GPIOC;
-  uint16_t pin_rx = 5;
-  uint16_t pin_tx = 4;
+  gpio_ptr = GPIOC;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_5 : GPIO_PIN_5);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4);
 #else
-  GPIO_TypeDef *gpio_ptr = GPIOA;
-  uint16_t pin_rx = 10;
-  uint16_t pin_tx = 9;
+  gpio_ptr = GPIOA;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_9 : GPIO_PIN_9);
 #endif
 
 #elif UART_NUM == 2
   uart_ptr = USART2;
 #if AFIO_USART2_ENABLE == 1
   /* JTAG pins. Need remapping! */
-  GPIO_TypeDef *gpio_ptr = GPIOA;
-  uint16_t pin_rx = 15;
-  uint16_t pin_tx = 14;
+  gpio_ptr = GPIOA;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_15 : GPIO_PIN_15);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_14 : GPIO_PIN_14);
 #elif AFIO_USART2_ENABLE == 2
   /* JTAG pins. Need remapping! */
-  GPIO_TypeDef *gpio_ptr = GPIOB;
-  uint16_t pin_rx = 4;
-  uint16_t pin_tx = 3;
+  gpio_ptr = GPIOB;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3);
 #else //! AFIO_USART2_ENABLE
-  GPIO_TypeDef *gpio_ptr = GPIOA;
-  uint16_t pin_rx = 3;
-  uint16_t pin_tx = 2;
+  gpio_ptr = GPIOA;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_2 : GPIO_PIN_2);
 #endif
 
 #elif UART_NUM == 3 && defined(USART3)
   uart_ptr = USART3;
 
 #if AFIO_USART3_ENABLE == 1
-  GPIO_TypeDef *gpio_ptr = GPIOB;
-  uint16_t pin_rx = 8;
-  uint16_t pin_tx = 9;
+  gpio_ptr = GPIOB;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_8 : GPIO_PIN_8);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_9 : GPIO_PIN_9);
 #elif AFIO_USART3_ENABLE == 2
-  GPIO_TypeDef *gpio_ptr = GPIOC;
-  uint16_t pin_rx = 11;
-  uint16_t pin_tx = 10;
+  gpio_ptr = GPIOC;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
 #else
-  GPIO_TypeDef *gpio_ptr = GPIOB;
-  uint16_t pin_rx = 11;
-  uint16_t pin_tx = 10;
+  gpio_ptr = GPIOB;
+  pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11);
+  pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
 #endif
 
 #else
@@ -363,13 +367,10 @@ void uart_init(void)
   }
 #endif
 
-#if GPIO_USE_LL
-  pin_rx = 0x1 << pin_rx;
-  pin_tx = 0x1 << pin_tx;
+  gpio_port_clock((uint32_t)gpio_ptr);
 
+#if GPIO_USE_LL
   /* RX pin */
-  LL_GPIO_SetPinSpeed(gpio_ptr, pin_rx, LL_GPIO_SPEED_FREQ_HIGH);
-  LL_GPIO_SetPinPull(gpio_ptr, pin_rx, LL_GPIO_PULL_UP);
 #if defined(STM32L0xx)
   LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_ALTERNATE);
   if (uart_ptr == USART1 && pin_rx == LL_GPIO_PIN_7) {
@@ -389,6 +390,8 @@ void uart_init(void)
 #else
   LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_INPUT);
 #endif
+  //LL_GPIO_SetPinSpeed(gpio_ptr, pin_rx, LL_GPIO_SPEED_FREQ_HIGH);
+  LL_GPIO_SetPinPull(gpio_ptr, pin_rx, LL_GPIO_PULL_UP);
 
   /* TX pin */
   LL_GPIO_SetPinMode(gpio_ptr, pin_tx, LL_GPIO_MODE_ALTERNATE);
@@ -412,12 +415,12 @@ void uart_init(void)
 
 #else // !GPIO_USE_LL
   /* RX pin */
-  GPIO_InitStruct.Pin = (1 << pin_rx);
+  GPIO_InitStruct.Pin = pin_rx;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 #if defined(STM32L0xx)
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  if (uart_ptr == USART1 && pin_rx == 7) {
+  if (uart_ptr == USART1 && pin_rx == GPIO_PIN_7) {
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
   } else {
     GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
@@ -431,12 +434,12 @@ void uart_init(void)
   HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
 
   /* TX pin */
-  GPIO_InitStruct.Pin = (1 << pin_tx);
+  GPIO_InitStruct.Pin = pin_tx;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 #if defined(STM32L0xx)
-  if (uart_ptr == USART1 && pin_tx == 6) {
+  if (uart_ptr == USART1 && pin_tx == GPIO_PIN_6) {
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
   } else {
     GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
