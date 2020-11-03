@@ -69,15 +69,15 @@ enum duplex_state
 };
 
 enum {
-  A = 'A',
-  B = 'B',
-  C = 'C',
-  D = 'D',
-  E = 'E',
-  F = 'F'
+  IO_PORT_A = 'A',
+  IO_PORT_B = 'B',
+  IO_PORT_C = 'C',
+  IO_PORT_D = 'D',
+  IO_PORT_E = 'E',
+  IO_PORT_F = 'F'
 };
-
-#define IO_CREATE_IMPL(port, pin) ((port * 16) + pin)
+#define CONCAT(_P) IO_PORT_ ## _P
+#define IO_CREATE_IMPL(port, pin) ((CONCAT(port) * 16) + pin)
 #define IO_CREATE(...)  IO_CREATE_IMPL(__VA_ARGS__)
 #define IO_GET_PORT(_p) (((_p) / 16) - 'A')
 #define IO_GET_PIN(_p)  ((_p) % 16)
@@ -101,13 +101,6 @@ void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin);
 void gpio_port_clock(uint32_t port);
 
 #if GPIO_USE_LL
-/*static inline void GPIO_WritePin(GPIO_TypeDef *GPIOx, uint32_t pin, uint8_t state)
-{
-  if (state)
-    LL_GPIO_SetOutputPin(GPIOx, pin);
-  else
-    LL_GPIO_ResetOutputPin(GPIOx, pin);
-}*/
 #define GPIO_WritePin(port, pin, _state) \
   (_state) ? LL_GPIO_SetOutputPin(port, pin) : \
   LL_GPIO_ResetOutputPin(port, pin)
@@ -119,70 +112,6 @@ void gpio_port_clock(uint32_t port);
 #if !defined(XMODEM) && !STK500 && !FRSKY
 #define XMODEM 1 // Default is XMODEM protocol
 #endif
-
-#ifdef BUTTON
-#if TARGET_R9MX
-#define BTN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_0 : GPIO_PIN_0)
-#define BTN_GPIO_Port GPIOB
-#elif TARGET_R9MM
-#define BTN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_13 : GPIO_PIN_13)
-#define BTN_GPIO_Port GPIOC
-#elif TARGET_SX1280_RX_Nano_v05
-#define BTN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3)
-#define BTN_GPIO_Port GPIOA
-#elif TARGET_GHOST_RX_V1_2
-#define BTN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_12 : GPIO_PIN_12)
-#define BTN_GPIO_Port GPIOA
-#endif
-#endif /* BUTTON */
-
-#ifdef LED_GRN
-#if TARGET_R9MM
-#define LED_GRN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3)
-#define LED_GRN_GPIO_Port GPIOB
-#elif TARGET_R9M
-#define LED_GRN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_12 : GPIO_PIN_12)
-#define LED_GRN_GPIO_Port GPIOA
-#elif TARGET_R9MX
-#define LED_GRN_Pin (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3)
-#define LED_GRN_GPIO_Port GPIOB
-#endif
-#endif /* LED_GRN */
-
-#ifdef LED_RED
-#if TARGET_R9MM
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_1 : GPIO_PIN_1)
-#define LED_RED_GPIO_Port GPIOC
-#elif TARGET_R9M
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11)
-#define LED_RED_GPIO_Port GPIOA
-#elif TARGET_RHF76
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4)
-#define LED_RED_GPIO_Port GPIOB
-#elif TARGET_RAK4200
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_12 : GPIO_PIN_12)
-#define LED_RED_GPIO_Port GPIOA
-#elif TARGET_RAK811
-
-#elif TARGET_SX1280_RX_2020_v02
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_15 : GPIO_PIN_15)
-#define LED_RED_GPIO_Port GPIOB
-#elif TARGET_R9MX
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_2 : GPIO_PIN_2)
-#define LED_RED_GPIO_Port GPIOB
-#elif TARGET_SX1280_RX_Nano_v05
-#define LED_RED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_5 : GPIO_PIN_5)
-#define LED_RED_GPIO_Port GPIOB
-#elif TARGET_GHOST_RX_V1_2
-#define WS2812_LED_Pin (GPIO_USE_LL ? LL_GPIO_PIN_7 : GPIO_PIN_7)
-#define WS2812_LED_Port GPIOA
-#endif
-#endif /* LED_RED */
-
-#if TARGET_R9M
-#define DUPLEX_Pin (GPIO_USE_LL ? LL_GPIO_PIN_5 : GPIO_PIN_5)
-#define DUPLEX_Port GPIOA
-#endif /* TARGET_R9M */
 
 #endif /* __MAIN_H */
 

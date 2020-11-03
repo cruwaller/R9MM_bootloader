@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 
-#if defined(WS2812_LED_PIN) || (defined(WS2812_LED_Port) && defined(WS2812_LED_Pin))
+#if defined(WS2812_LED_PIN)
 void ws2812_init(void);
 void ws2812_set_color(uint8_t const r, uint8_t const g, uint8_t const b);
+void ws2812_set_color_u32(uint32_t const rgb);
 #else
 #define ws2812_init()
 #define ws2812_set_color(...)

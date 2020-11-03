@@ -3,6 +3,10 @@ import stlink
 import shutil, os
 
 def rename_bin(source, target, env):
+    try:
+        os.mkdir("binaries")
+    except OSError:
+        pass
     #print("source: %s" % source
     #print("target: %s" % target)
     #print("env: %s" % env.Dump())

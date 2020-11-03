@@ -47,30 +47,18 @@
 #if defined(BUTTON_PIN)
 void *btn_port;
 uint32_t btn_pin;
-#else
-#define btn_port BTN_GPIO_Port
-#define btn_pin BTN_Pin
 #endif
 #if defined(LED_RED_PIN)
 void *led_red_port;
 uint32_t led_red_pin;
-#else
-#define led_red_port LED_RED_GPIO_Port
-#define led_red_pin LED_RED_Pin
 #endif
 #if defined(LED_GREEN_PIN)
 void *led_green_port;
 uint32_t led_green_pin;
-#else
-#define led_green_port LED_GRN_GPIO_Port
-#define led_green_pin LED_GRN_Pin
 #endif
 #if defined(DUPLEX_PIN)
 void *duplex_port;
 uint32_t duplex_pin;
-#else
-#define duplex_port DUPLEX_Port
-#define duplex_pin DUPLEX_Pin
 #endif
 
 #if GPIO_USE_LL
@@ -155,18 +143,19 @@ void led_state_set(uint32_t state)
     val = 0x0;
   };
 
-#if defined(LED_RED)
+#if defined(LED_RED_PIN)
   GPIO_WritePin(led_red_port, led_red_pin, !!(uint8_t)val);
 #endif
-#if defined(LED_GRN)
+#if defined(LED_GREEN_PIN)
   GPIO_WritePin(led_green_port, led_green_pin, !!(uint8_t)(val >> 8));
 #endif
-  ws2812_set_color((uint8_t)(val), (uint8_t)(val >> 8), (uint8_t)(val >> 16));
+  //ws2812_set_color((uint8_t)(val), (uint8_t)(val >> 8), (uint8_t)(val >> 16));
+  ws2812_set_color_u32(val);
 }
 
 void duplex_state_set(const enum duplex_state state)
 {
-#if TARGET_R9M
+#if defined(DUPLEX_PIN)
   GPIO_WritePin(duplex_port, duplex_pin, (state == DUPLEX_TX));
 #else
   (void)state;
@@ -191,7 +180,7 @@ static void boot_code(void)
    * otherwise stay in the bootloader. */
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
 
-#if defined(BUTTON) && BUTTON_NEW_BOUNCE
+#if defined(BUTTON_PIN) && BUTTON_NEW_BOUNCE
   uint32_t btn_val = !!BTN_READ();
 #endif
 
@@ -203,7 +192,7 @@ static void boot_code(void)
   {
     BLrequested = true;
   }
-#if defined(BUTTON)
+#if defined(BUTTON_PIN)
 #if BUTTON_NEW_BOUNCE
   // Debounce check (1sec)
   else if (!!BTN_READ() == btn_val && (btn_val ^ BUTTON_INVERTED) == 1) {
@@ -231,7 +220,7 @@ static void boot_code(void)
       }
     }
 #endif /* BUTTON_NEW_BOUNCE */
-#endif /* BUTTON */
+#endif /* BUTTON_PIN */
 
   if (!BLrequested)
   {
@@ -447,18 +436,15 @@ void SystemClock_Config(void)
  */
 static void MX_GPIO_Init(void)
 {
-#if defined(BTN_Pin)     || defined(LED_GRN_Pin) || defined(LED_RED_Pin)   || \
-    defined(DUPLEX_Pin)  || defined(BUTTON_PIN)  || defined(LED_GREEN_PIN) || \
-    defined(LED_RED_PIN) || defined(DUPLEX_PIN)
 #if !GPIO_USE_LL
+#if defined(BUTTON_PIN) || defined(LED_GREEN_PIN) || defined(LED_RED_PIN) ||   \
+    defined(DUPLEX_PIN)
   GPIO_InitTypeDef GPIO_InitStruct;
 #endif
 #endif
 
-#ifdef BUTTON
 #if defined(BUTTON_PIN)
   gpio_port_pin_get(IO_CREATE(BUTTON_PIN), &btn_port, &btn_pin);
-#endif
   gpio_port_clock((uint32_t)btn_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(btn_port, btn_pin, LL_GPIO_MODE_INPUT);
@@ -472,12 +458,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(btn_port, &GPIO_InitStruct);
 #endif // GPIO_USE_LL
-#endif // BUTTON
+#endif // BUTTON_PIN
 
-#ifdef LED_GRN
 #if defined(LED_GREEN_PIN)
   gpio_port_pin_get(IO_CREATE(LED_GREEN_PIN), &led_green_port, &led_green_pin);
-#endif
   gpio_port_clock((uint32_t)led_green_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_green_port, led_green_pin, LL_GPIO_MODE_OUTPUT);
@@ -493,12 +477,10 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(led_green_port, led_green_pin, GPIO_PIN_RESET);
 #endif // GPIO_USE_LL
-#endif // LED_GRN
+#endif // LED_GREEN_PIN
 
-#ifdef LED_RED
 #if defined(LED_RED_PIN)
   gpio_port_pin_get(IO_CREATE(LED_RED_PIN), &led_red_port, &led_red_pin);
-#endif
   gpio_port_clock((uint32_t)led_red_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_red_port, led_red_pin, LL_GPIO_MODE_OUTPUT);
@@ -514,12 +496,10 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(led_red_port, led_red_pin, GPIO_PIN_RESET);
 #endif // GPIO_USE_LL
-#endif // LED_RED
+#endif // LED_RED_PIN
 
-#if TARGET_R9M
 #if defined(DUPLEX_PIN)
   gpio_port_pin_get(IO_CREATE(DUPLEX_PIN), &duplex_port, &duplex_pin);
-#endif
   gpio_port_clock((uint32_t)duplex_port);
 #if GPIO_USE_LL
   LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);
@@ -535,7 +515,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(duplex_port, duplex_pin, GPIO_PIN_RESET);
 #endif // GPIO_USE_LL
-#endif // TARGET_R9M
+#endif // DUPLEX_PIN
 
   ws2812_init();
 }
