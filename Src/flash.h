@@ -25,7 +25,7 @@
 
 /* Extern vertor start address */
 extern uint32_t g_pfnVectors;
-#define BL_FLASH_START ((uint32_t)&g_pfnVectors)
+#define BL_FLASH_START ((__IO uint32_t)&g_pfnVectors)
 
 /* Application space offset */
 #ifndef FLASH_APP_OFFSET

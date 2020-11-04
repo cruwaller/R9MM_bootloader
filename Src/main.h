@@ -54,6 +54,10 @@
 #define STRINGIFY(str) #str
 #define BUILD_MCU_TYPE(type) STRINGIFY(BL_TYPE: type)
 
+#ifndef GPIO_USE_LL
+#define GPIO_USE_LL 0
+#endif
+
 /* Private includes ----------------------------------------------------------*/
 
 /* Exported types ------------------------------------------------------------*/

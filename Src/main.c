@@ -130,7 +130,7 @@ void led_state_set(uint32_t state)
     val = 0x00ffff;
     break;
   case LED_FLASHING:
-    val = 0x00ffff;
+    val = 0x0000ff;
     break;
   case LED_FLASHING_ALT:
     val = 0x00ff00;
@@ -170,7 +170,7 @@ static void boot_code(void)
 
   /* Send welcome message on startup. */
   uart_transmit_str((uint8_t *)"\n\r=========================\n\r");
-  uart_transmit_str((uint8_t *)"  ExpressLRS bootloader\n\r");
+  uart_transmit_str((uint8_t *)"  Bootloader for ExpressLRS\n\r");
   uart_transmit_str((uint8_t *)"=========================\n\r");
 #if defined(MCU_TYPE)
   uart_transmit_str((uint8_t *)BUILD_MCU_TYPE(MCU_TYPE));
