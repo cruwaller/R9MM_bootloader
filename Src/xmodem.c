@@ -47,19 +47,19 @@ void xmodem_receive(void) {
 
     /* Get the header from UART. */
     uart_status comm_status = uart_receive_timeout(&header, 1u, 1000u);
-
-    /* Spam the host (until we receive something) with ACSII "C", to notify it,
-     * we want to use CRC-16. */
-    if ((UART_OK != comm_status) && (false == x_first_packet_received)) {
-      (void)uart_transmit_ch(X_C);
-      led_state_set(ledState ? LED_FLASHING : LED_FLASHING_ALT);
-      ledState = !ledState;
-    }
-    /* Uart timeout or any other errors. */
-    else if ((UART_OK != comm_status) && (true == x_first_packet_received)) {
-      status = xmodem_error_handler(&error_number, X_MAX_ERRORS);
-    } else {
-      /* Do nothing. */
+    if (UART_OK != comm_status) {
+      /* Spam the host (until we receive something) with ACSII "C", to notify it,
+      * we want to use CRC-16. */
+      if (false == x_first_packet_received) {
+        (void)uart_transmit_ch(X_C);
+        led_state_set(ledState ? LED_FLASHING : LED_FLASHING_ALT);
+        ledState = !ledState;
+      }
+      /* Uart timeout or any other errors. */
+      else {
+        status = xmodem_error_handler(&error_number, X_MAX_ERRORS);
+      }
+      continue;
     }
 
     xmodem_status packet_status = X_ERROR;

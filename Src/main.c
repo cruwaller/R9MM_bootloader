@@ -38,8 +38,6 @@
 
 /* Private define ------------------------------------------------------------*/
 
-#define BUTTON_NEW_BOUNCE 1
-
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
@@ -165,7 +163,7 @@ void duplex_state_set(const enum duplex_state state)
 #if XMODEM
 static void boot_code(void)
 {
-  bool BLrequested = false;
+  uint8_t BLrequested = 0;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
   /* Send welcome message on startup. */
@@ -180,46 +178,23 @@ static void boot_code(void)
    * otherwise stay in the bootloader. */
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
 
-#if defined(PIN_BUTTON) && BUTTON_NEW_BOUNCE
-  uint32_t btn_val = !!BTN_READ();
-#endif
-
   /* Wait input from UART */
   uart_receive(header, 5u);
 
   /* Search for magic strings */
   if (strstr((char *)header, "2bl") || strstr((char *)header, "bbb"))
   {
-    BLrequested = true;
+    BLrequested = 1;
   }
 #if defined(PIN_BUTTON)
-#if BUTTON_NEW_BOUNCE
-  // Debounce check (1sec)
-  else if (!!BTN_READ() == btn_val && (btn_val ^ BUTTON_INVERTED) == 1) {
-    // Button value is still same and is pressed
-    BLrequested = true;
-  }
-#else // !BUTTON_NEW_BOUNCE
   // Wait button press to access bootloader
-  if (!BLrequested) // Check UART if not button not pressed
-    for (int i = 0; i < 2; i++)
-    {
-      if ((!!BTN_READ() ^ BUTTON_INVERTED) == 1)
-      {
-        HAL_Delay(100); // wait debounce
-        if ((!!BTN_READ() ^ BUTTON_INVERTED) == 1)
-        {
-          // Button still pressed
-          BLrequested = true;
-          break;
-        }
-      }
-      else
-      {
-        HAL_Delay(50);
-      }
+  if (!BLrequested && (!!BTN_READ() ^ BUTTON_INVERTED)) {
+    HAL_Delay(200); // wait debounce
+    if ((!!BTN_READ() ^ BUTTON_INVERTED)) {
+      // Button still pressed
+      BLrequested = 2;
     }
-#endif /* BUTTON_NEW_BOUNCE */
+  }
 #endif /* PIN_BUTTON */
 
   if (!BLrequested)
@@ -228,6 +203,56 @@ static void boot_code(void)
      * it's own purpose, thus if RED stays on there is an error */
     // uart_transmit_str((uint8_t *)"Start app\n\r");
     flash_jump_to_app();
+  }
+  /* Wait command from uploader script if button was preassed */
+  else if (BLrequested == 2) {
+    BLrequested = 0;
+    while (1) {
+      if (BLrequested < 6) {
+        if (uart_receive_timeout(header, 1, 1000U) != UART_OK)
+          continue;
+        uint8_t ch = header[0];
+
+        switch (BLrequested) {
+          case 0:
+            if (ch == 0xEC) BLrequested++;
+            else BLrequested = 0;
+            break;
+          case 1:
+            if (ch == 0x04) BLrequested++;
+            else BLrequested = 0;
+            break;
+          case 2:
+            if (ch == 0x32) BLrequested++;
+            else BLrequested = 0;
+            break;
+          case 3:
+            if (ch == 0x62) BLrequested++;
+            else BLrequested = 0;
+            break;
+          case 4:
+            if (ch == 0x6c) BLrequested++;
+            else BLrequested = 0;
+            break;
+          case 5:
+            if (ch == 0x0A) BLrequested++;
+            else BLrequested = 0;
+            break;
+
+        }
+      } else {
+        /* Boot cmd => wait 'bbb' */
+        uart_transmit_str((uint8_t *)"  Bootloader for ExpressLRS\n\r");
+        if (uart_receive_timeout(header, 5, 2000U) != UART_OK) {
+          BLrequested = 0;
+          continue;
+        }
+        if (strstr((char *)header, "bbb")) {
+          /* Script ready for upload... */
+          break;
+        }
+      }
+    }
   }
 
   /* Infinite loop */
