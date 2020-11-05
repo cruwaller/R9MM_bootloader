@@ -309,7 +309,11 @@ int main(void)
   /* MCU Configuration---------------------------------------------*/
 
   /* Make sure the vectors are set correctly */
+#if !defined(STM32L4xx)
   SCB->VTOR = BL_FLASH_START;
+#else
+  __set_MSP(*(volatile uint32_t *)BL_FLASH_START);
+#endif
 
   /* Reset of all peripherals, Initializes the Flash interface and the
    * Systick.
