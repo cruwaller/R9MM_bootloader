@@ -167,9 +167,11 @@ static void boot_code(void)
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
   /* Send welcome message on startup. */
-  uart_transmit_str((uint8_t *)"\n\r=========================\n\r");
+  uart_transmit_str((uint8_t *)"\n\r========== v");
+  uart_transmit_str((uint8_t *)BUILD_VERSION(BOOTLOADER_VERSION));
+  uart_transmit_str((uint8_t *)" =============\n\r");
   uart_transmit_str((uint8_t *)"  Bootloader for ExpressLRS\n\r");
-  uart_transmit_str((uint8_t *)"=========================\n\r");
+  uart_transmit_str((uint8_t *)"=============================\n\r");
 #if defined(MCU_TYPE)
   uart_transmit_str((uint8_t *)BUILD_MCU_TYPE(MCU_TYPE));
   uart_transmit_str((uint8_t *)"\n\r");

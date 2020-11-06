@@ -52,6 +52,7 @@
 #endif
 
 #define STRINGIFY(str) #str
+#define BUILD_VERSION(ver) STRINGIFY(ver)
 #define BUILD_MCU_TYPE(type) STRINGIFY(BL_TYPE: type)
 
 #ifndef GPIO_USE_LL
