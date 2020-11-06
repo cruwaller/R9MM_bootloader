@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 /* Timeout for HAL. */
-#define UART_TIMEOUT ((uint16_t)1000u)
+#define UART_TIMEOUT ((uint16_t)2000u)
 
 /* Status report for the functions. */
 typedef enum

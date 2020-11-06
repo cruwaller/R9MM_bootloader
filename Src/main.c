@@ -179,13 +179,11 @@ static void boot_code(void)
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
 
   /* Wait input from UART */
-  uart_receive(header, 5u);
-
-  /* Search for magic strings */
-  if (strstr((char *)header, "2bl") || strstr((char *)header, "bbb"))
-  {
-    BLrequested = 1;
+  if (uart_receive(header, 5u) == UART_OK) {
+    /* Search for magic strings */
+    BLrequested = (strstr((char *)header, "bbb") || strstr((char *)header, "2bl")) ? 1 : 0;
   }
+
 #if defined(PIN_BUTTON)
   // Wait button press to access bootloader
   if (!BLrequested && (!!BTN_READ() ^ BUTTON_INVERTED)) {
@@ -242,7 +240,7 @@ static void boot_code(void)
         }
       } else {
         /* Boot cmd => wait 'bbb' */
-        uart_transmit_str((uint8_t *)"  Bootloader for ExpressLRS\n\r");
+        uart_transmit_str((uint8_t *)"Bootloader for ExpressLRS\n\r");
         if (uart_receive_timeout(header, 5, 2000U) != UART_OK) {
           BLrequested = 0;
           continue;
@@ -309,11 +307,7 @@ int main(void)
   /* MCU Configuration---------------------------------------------*/
 
   /* Make sure the vectors are set correctly */
-#if !defined(STM32L4xx)
   SCB->VTOR = BL_FLASH_START;
-#else
-  __set_MSP(*(volatile uint32_t *)BL_FLASH_START);
-#endif
 
   /* Reset of all peripherals, Initializes the Flash interface and the
    * Systick.
