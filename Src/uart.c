@@ -13,7 +13,7 @@
 
 #if USART_USE_LL
 USART_TypeDef *UART_handle;
-#if TARGET_GHOST_RX_V1_2
+#if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
 USART_TypeDef *UART_handle_tx;
 #define UART_TX_HANDLE UART_handle_tx
 #else
@@ -265,9 +265,11 @@ void uart_init(void)
 
 #if USART_USE_LL
   usart_hw_init(USART2, USART_CR1_TE); // TX, half duplex
-  UART_handle = USART2;
+  LL_USART_EnableHalfDuplex(USART2);
+  UART_TX_HANDLE = USART2;
   usart_hw_init(USART1, USART_CR1_RE); // RX, half duplex
-  UART_TX_HANDLE = USART1;
+  LL_USART_EnableHalfDuplex(USART1);
+  UART_handle = USART1;
 #else // !USART_USE_LL
   /* Init TX UART */
   huart_tx.Instance = USART2;
@@ -292,7 +294,38 @@ void uart_init(void)
   }
 #endif // USART_USE_LL
 
-#else //!TARGET_GHOST_RX_V1_2
+#elif TARGET_R9SLIM_PLUS // !TARGET_GHOST_RX_V1_2
+
+  // RX = PB11 [USART3]
+  // TX = PA9 [USART1]
+
+  /* Reset RX UART */
+  __HAL_RCC_USART3_FORCE_RESET();
+  __HAL_RCC_USART3_RELEASE_RESET();
+  __HAL_RCC_USART3_CLK_ENABLE();
+
+  /* Reset TX UART */
+  __HAL_RCC_USART1_FORCE_RESET();
+  __HAL_RCC_USART1_RELEASE_RESET();
+  __HAL_RCC_USART1_CLK_ENABLE();
+
+  /* UART RX pin config */
+  gpio_port_clock((uint32_t)GPIOB);
+  LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_11, LL_GPIO_MODE_INPUT);
+  LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_11, LL_GPIO_PULL_UP);
+
+  /* UART TX pin config */
+  gpio_port_clock((uint32_t)GPIOA);
+  LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
+  LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_HIGH);
+  LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_9, LL_GPIO_PULL_UP);
+
+  usart_hw_init(USART1, USART_CR1_TE); // TX, half duplex
+  UART_TX_HANDLE = USART1;
+  usart_hw_init(USART3, USART_CR1_RE); // RX, half duplex
+  UART_handle = USART3;
+
+#else //!TARGET_GHOST_RX_V1_2 && !TARGET_R9SLIM_PLUS
   USART_TypeDef * uart_ptr;
   GPIO_TypeDef *gpio_ptr;
   uint32_t pin_rx, pin_tx;
