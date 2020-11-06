@@ -161,14 +161,14 @@ void duplex_state_set(const enum duplex_state state)
 }
 
 #if XMODEM
-static void boot_code(void)
-{
-  uint8_t BLrequested = 0;
-  uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
+static void print_boot_header(void)
+{
   /* Send welcome message on startup. */
   uart_transmit_str((uint8_t *)"\n\r========== v");
+#if defined(BOOTLOADER_VERSION)
   uart_transmit_str((uint8_t *)BUILD_VERSION(BOOTLOADER_VERSION));
+#endif
   uart_transmit_str((uint8_t *)" =============\n\r");
   uart_transmit_str((uint8_t *)"  Bootloader for ExpressLRS\n\r");
   uart_transmit_str((uint8_t *)"=============================\n\r");
@@ -176,6 +176,15 @@ static void boot_code(void)
   uart_transmit_str((uint8_t *)BUILD_MCU_TYPE(MCU_TYPE));
   uart_transmit_str((uint8_t *)"\n\r");
 #endif
+}
+
+static void boot_code(void)
+{
+  uint32_t ticks;
+  uint8_t BLrequested = 0, ledState = 0;
+  uint8_t header[6] = {0, 0, 0, 0, 0, 0};
+
+  print_boot_header();
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
   uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
@@ -207,10 +216,18 @@ static void boot_code(void)
   /* Wait command from uploader script if button was preassed */
   else if (BLrequested == 2) {
     BLrequested = 0;
+    ticks = HAL_GetTick();
     while (1) {
       if (BLrequested < 6) {
-        if (uart_receive_timeout(header, 1, 1000U) != UART_OK)
+        if (1000 <= (HAL_GetTick() - ticks)) {
+          led_state_set(ledState ? LED_FLASHING : LED_FLASHING_ALT);
+          ledState ^= 1;
+          ticks = HAL_GetTick();
+        }
+
+        if (uart_receive_timeout(header, 1, 1000U) != UART_OK) {
           continue;
+        }
         uint8_t ch = header[0];
 
         switch (BLrequested) {
@@ -242,7 +259,7 @@ static void boot_code(void)
         }
       } else {
         /* Boot cmd => wait 'bbb' */
-        uart_transmit_str((uint8_t *)"Bootloader for ExpressLRS\n\r");
+        print_boot_header();
         if (uart_receive_timeout(header, 5, 2000U) != UART_OK) {
           BLrequested = 0;
           continue;
