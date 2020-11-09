@@ -251,6 +251,11 @@ void flash_jump_to_app(void)
 {
   led_state_set(LED_STARTING);
 
+  if (flash_check_app_loaded() < 0) {
+    /* Restart if no valid app found */
+    NVIC_SystemReset();
+  }
+
   /* Function pointer to the address of the user application. */
   fnc_ptr jump_to_app;
   jump_to_app = (fnc_ptr)(*(volatile uint32_t *)(FLASH_APP_START_ADDRESS + 4u));
@@ -264,4 +269,18 @@ void flash_jump_to_app(void)
 
   while(1)
     ;
+}
+
+int8_t flash_check_app_loaded(void)
+{
+  /* Check if app is already loaded */
+  uintptr_t app_stack = *(volatile uintptr_t *)(FLASH_APP_START_ADDRESS);
+  uintptr_t app_reset = *(volatile uintptr_t *)(FLASH_APP_START_ADDRESS + 4u);
+  uintptr_t app_nmi = *(volatile uintptr_t *)(FLASH_APP_START_ADDRESS + 8u);
+  if (((uint8_t)(app_stack >> 24) == 0x20) ||
+      ((uint8_t)(app_reset >> 24) == 0x08) ||
+      ((uint8_t)(app_nmi >> 24) == 0x08)) {
+    return 0;
+  }
+  return -1;
 }

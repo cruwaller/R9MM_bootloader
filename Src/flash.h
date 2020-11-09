@@ -76,6 +76,6 @@ flash_status flash_write(uint32_t address, uint32_t *data, uint32_t length);
 flash_status flash_write_halfword(uint32_t address, uint16_t *data,
                                   uint32_t length);
 void flash_jump_to_app(void);
-void flash_jump_to_bl(void);
+int8_t flash_check_app_loaded(void);
 
 #endif /* FLASH_H_ */
