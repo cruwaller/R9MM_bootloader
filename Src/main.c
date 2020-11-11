@@ -24,13 +24,10 @@
 #include "led.h"
 #include "uart.h"
 #include "flash.h"
-#if XMODEM
 #include "xmodem.h"
-#elif STK500
 #include "stk500.h"
-#elif FRSKY
 #include "frsky.h"
-#else
+#if !XMODEM && !STK500 && !FRSKY
 #error "Upload protocol not defined!"
 #endif
 
@@ -178,7 +175,7 @@ static void print_boot_header(void)
 #endif
 }
 
-static void boot_code(void)
+static void boot_code_xmodem(void)
 {
   uint32_t ticks;
   uint8_t BLrequested = 0, ledState = 0;
@@ -283,6 +280,7 @@ static void boot_code(void)
 }
 
 #else // !XMODEM
+#endif /* XMODEM */
 
 #define BOOT_WAIT 300 // ms
 
@@ -298,6 +296,10 @@ static void boot_code(void)
 {
   boot_end_time = HAL_GetTick() + BOOT_WAIT;
 
+#if XMODEM
+  // Just wait a moment for sync and continue to xmodem
+  stk500_check();
+#else
   /* Infinite loop */
   while (1)
   {
@@ -313,9 +315,9 @@ static void boot_code(void)
       flash_jump_to_app();
     }
   }
+#endif
 }
 
-#endif /* XMODEM */
 
 /**
  * @brief  The application entry point.
@@ -344,6 +346,9 @@ int main(void)
 
   led_state_set(LED_BOOTING);
   boot_code();
+#if XMODEM
+  boot_code_xmodem();
+#endif
 }
 
 
