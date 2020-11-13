@@ -284,17 +284,17 @@ static void boot_code_xmodem(void)
 
 #define BOOT_WAIT 300 // ms
 
-static uint32_t boot_end_time;
+static uint32_t boot_start_time;
 
-int8_t timer_end(void)
+int8_t boot_wait_timer_end(void)
 {
   //return 0;
-  return (HAL_GetTick() > boot_end_time);
+  return (BOOT_WAIT < (HAL_GetTick() - boot_start_time));
 }
 
 static void boot_code(void)
 {
-  boot_end_time = HAL_GetTick() + BOOT_WAIT;
+  boot_start_time = HAL_GetTick();
 
 #if XMODEM
   // Just wait a moment for sync and continue to xmodem

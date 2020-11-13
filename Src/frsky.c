@@ -265,12 +265,12 @@ int8_t frsky_check(void)
                 /* frame start detected capture rest and process */
                 readFrame();
             }
-            else if (!flash_ongoing && timer_end())
+            else if (!flash_ongoing && boot_wait_timer_end())
             {
                 goto exit_frsky;
             }
         }
-        else if (!flash_ongoing && timer_end())
+        else if (!flash_ongoing && boot_wait_timer_end())
         {
             goto exit_frsky;
         }

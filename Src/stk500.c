@@ -59,7 +59,7 @@ static int8_t stk500_update(void)
     ch = 0;
     if (uart_receive_timeout(&ch, 1u, 20) == UART_ERROR)
     {
-      if (!insync && timer_end())
+      if (!insync && boot_wait_timer_end())
         return -1;
       continue;
     }

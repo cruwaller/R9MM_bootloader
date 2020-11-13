@@ -100,7 +100,7 @@ enum led_states
 void Error_Handler(void);
 void led_state_set(uint32_t state);
 void duplex_state_set(const enum duplex_state state);
-int8_t timer_end(void);
+int8_t boot_wait_timer_end(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin);
 void gpio_port_clock(uint32_t port);
