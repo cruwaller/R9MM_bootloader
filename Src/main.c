@@ -353,8 +353,9 @@ int main(void)
   MX_GPIO_Init();
   led_state_set(LED_BOOTING);
 
+#if XMODEM && (UART_NUM_2ND != UART_NUM)
   boot_code();
-
+#endif
 #if XMODEM
   boot_code_xmodem();
 #endif
