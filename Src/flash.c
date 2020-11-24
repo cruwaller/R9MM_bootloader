@@ -277,8 +277,8 @@ int8_t flash_check_app_loaded(void)
   uintptr_t app_stack = *(volatile uintptr_t *)(FLASH_APP_START_ADDRESS);
   uintptr_t app_reset = *(volatile uintptr_t *)(FLASH_APP_START_ADDRESS + 4u);
   uintptr_t app_nmi = *(volatile uintptr_t *)(FLASH_APP_START_ADDRESS + 8u);
-  if (((uint8_t)(app_stack >> 24) == 0x20) ||
-      ((uint8_t)(app_reset >> 24) == 0x08) ||
+  if (((uint8_t)(app_stack >> 24) == 0x20) &&
+      ((uint8_t)(app_reset >> 24) == 0x08) &&
       ((uint8_t)(app_nmi >> 24) == 0x08)) {
     return 0;
   }
