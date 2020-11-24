@@ -134,11 +134,6 @@ uint8_t check_crc(const uint8_t first)
 
 void process_frame(const uint8_t first)
 {
-#if defined(DEBUG_UART) && defined(STM32F1)
-    //for (int iter = 0; iter < 8; iter++)
-    //    debug_send(frame[iter]);
-#endif
-
     /* Check CRC */
     if (check_crc(first))
     {

@@ -31,63 +31,6 @@ static UART_HandleTypeDef huart_tx;
 #endif
 #endif // USART_USE_LL
 
-#if defined(DEBUG_UART) && defined(STM32F1)
-#if (DEBUG_UART == UART_NUM)
-#error "Same uart cannot be used for debug and comminucation!"
-#endif
-
-UART_HandleTypeDef debug;
-
-void debug_init(void)
-{
-  /* Configure GPIO pins */
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  /* RX pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_10;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* TX pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_9;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  __HAL_RCC_USART1_FORCE_RESET();
-  __HAL_RCC_USART1_RELEASE_RESET();
-  __HAL_RCC_USART1_CLK_ENABLE();
-
-  // R9M - UART on external pin stripe
-  debug.Instance = USART1;
-  debug.Init.BaudRate = 57600;
-  debug.Init.WordLength = UART_WORDLENGTH_8B;
-  debug.Init.StopBits = UART_STOPBITS_1;
-  debug.Init.Parity = UART_PARITY_NONE;
-  debug.Init.Mode = UART_MODE_TX;
-  debug.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  debug.Init.OverSampling = UART_OVERSAMPLING_16;
-
-  if (HAL_UART_Init(&debug) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-void debug_send(uint8_t data)
-{
-  /* Make available the UART module. */
-  if (HAL_UART_STATE_TIMEOUT == HAL_UART_GetState(&debug))
-  {
-    HAL_UART_Abort(&debug);
-  }
-  HAL_UART_Transmit(&debug, &data, 1u, UART_TIMEOUT);
-}
-
-#endif
-
 #if USART_USE_RX_ISR
 #define USART_CR1_FLAGS (USART_CR1_UE | LL_USART_CR1_RXNEIE)
 #else
@@ -391,10 +334,6 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
 
 #if !USART_USE_LL
   memset(&huart1, 0, sizeof(huart1));
-#endif
-
-#if defined(DEBUG_UART) && defined(STM32F1)
-  debug_init();
 #endif
 
 #if TARGET_GHOST_RX_V1_2
