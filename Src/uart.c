@@ -13,7 +13,6 @@
 
 #define USART_USE_RX_ISR 1
 
-#if USART_USE_LL
 USART_TypeDef *UART_handle;
 #if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
 USART_TypeDef *UART_handle_tx;
@@ -21,15 +20,6 @@ USART_TypeDef *UART_handle_tx;
 #else
 #define UART_TX_HANDLE UART_handle
 #endif
-#else // !USART_USE_LL
-static UART_HandleTypeDef huart1;
-#if TARGET_GHOST_RX_V1_2
-static UART_HandleTypeDef huart_tx;
-#define UART_TX_HANDLE huart_tx
-#else
-#define UART_TX_HANDLE huart1
-#endif
-#endif // USART_USE_LL
 
 #if USART_USE_RX_ISR
 #define USART_CR1_FLAGS (USART_CR1_UE | LL_USART_CR1_RXNEIE)
@@ -81,18 +71,10 @@ void duplex_state_set(const uint8_t state)
   if (uart_half_duplex) {
     switch (state) {
       case DUPLEX_TX:
-#if USART_USE_LL
         UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_TE;
-#else
-      HAL_HalfDuplex_EnableTransmitter(&UART_TX_HANDLE);
-#endif
         break;
       case DUPLEX_RX:
-#if USART_USE_LL
         UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_RE;
-#else
-        HAL_HalfDuplex_EnableReceiver(&UART_TX_HANDLE);
-#endif
         break;
       default:
         break;
@@ -173,7 +155,6 @@ uart_status uart_receive(uint8_t *data, uint16_t length)
 
 uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeout)
 {
-#if USART_USE_LL
 #if !USART_USE_RX_ISR
   LL_USART_ClearFlag_ORE(UART_handle);
   LL_USART_ClearFlag_NE(UART_handle);
@@ -207,13 +188,6 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
 #endif
 
   return UART_OK;
-#else
-  if (HAL_OK == HAL_UART_Receive(&huart1, data, length, timeout))
-  {
-    return UART_OK;
-  }
-  return UART_ERROR;
-#endif
 }
 
 /**
@@ -245,7 +219,6 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
 {
   uart_status status = UART_OK;
   duplex_state_set(DUPLEX_TX);
-#if USART_USE_LL
   while (len--) {
     LL_USART_TransmitData8(UART_TX_HANDLE, *data++);
     while (!LL_USART_IsActiveFlag_TXE(UART_TX_HANDLE))
@@ -253,16 +226,10 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   }
   while (!LL_USART_IsActiveFlag_TC(UART_TX_HANDLE))
     ;
-#else
-  if (HAL_OK != HAL_UART_Transmit(&UART_TX_HANDLE, data, len, UART_TIMEOUT)) {
-    status = UART_ERROR;
-  }
-#endif
   duplex_state_set(DUPLEX_RX);
   return status;
 }
 
-#if USART_USE_LL
 static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, uint8_t halfduplex) {
   uint32_t pclk = SystemCoreClock / 2;
 #if defined(STM32F1)
@@ -296,7 +263,6 @@ static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, ui
   }
 #endif // USART_USE_RX_ISR
 }
-#endif // USART_USE_LL
 
 static void uart_reset(USART_TypeDef * uart_ptr)
 {
@@ -330,10 +296,6 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
 {
 #if !GPIO_USE_LL
   GPIO_InitTypeDef GPIO_InitStruct;
-#endif
-
-#if !USART_USE_LL
-  memset(&huart1, 0, sizeof(huart1));
 #endif
 
 #if TARGET_GHOST_RX_V1_2
@@ -374,34 +336,10 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 #endif // GPIO_USE_LL
 
-#if USART_USE_LL
   usart_hw_init(USART2, baud, USART_CR1_TE, 1); // TX, half duplex
   UART_TX_HANDLE = USART2;
   usart_hw_init(USART1, baud, USART_CR1_RE, 1); // RX, half duplex
   UART_handle = USART1;
-#else // !USART_USE_LL
-  /* Init TX UART */
-  huart_tx.Instance = USART2;
-  huart_tx.Init.BaudRate = baud;
-  huart_tx.Init.WordLength = UART_WORDLENGTH_8B;
-  huart_tx.Init.StopBits = UART_STOPBITS_1;
-  huart_tx.Init.Parity = UART_PARITY_NONE;
-  huart_tx.Init.Mode = UART_MODE_TX;
-  huart_tx.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart_tx.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart_tx.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  if (HAL_HalfDuplex_Init(&huart_tx) != HAL_OK) {
-    Error_Handler();
-  }
-
-  /* Init RX UART */
-  memcpy(&huart1.Init, &huart_tx.Init, sizeof(huart_tx.Init));
-  huart1.Instance = USART1;
-  huart1.Init.Mode = UART_MODE_RX;
-  if (HAL_HalfDuplex_Init(&huart1) != HAL_OK) {
-    Error_Handler();
-  }
-#endif // USART_USE_LL
 
 #elif TARGET_R9SLIM_PLUS // !TARGET_GHOST_RX_V1_2
   (void)duplexpin;
@@ -604,27 +542,8 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   duplex_setup_pin(duplexpin);
   duplex_state_set(DUPLEX_RX);
 
-#if USART_USE_LL
   UART_handle = uart_ptr;
   usart_hw_init(uart_ptr, baud, dir, halfduplex);
-#else // USART_USE_LL
-  huart1.Instance = uart_ptr;
-  huart1.Init.BaudRate = baud;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  if (halfduplex)
-    huart1.Init.Mode = UART_MODE_RX;
-  else
-    huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-#endif // USART_USE_LL
 #endif // TARGET_GHOST_RX_V1_2
 }
 
