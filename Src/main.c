@@ -179,6 +179,16 @@ static void boot_code_xmodem(void)
    * otherwise stay in the bootloader. */
   uart_transmit_str("Send 'bbb' or hold down button\n\r");
 
+#if 0 // UART ECHO DEBUG
+  while(1) {
+    if (uart_receive_timeout(header, 5u, 10000) == UART_OK) {
+      uart_transmit_bytes(header, 5);
+    } else {
+      uart_transmit_ch('F');
+    }
+  }
+#endif
+
   /* Wait input from UART */
   if (uart_receive(header, 5u) == UART_OK) {
     /* Search for magic strings */
@@ -302,6 +312,10 @@ static void boot_code(void)
 #ifndef UART_BAUD_2ND
 #define UART_BAUD_2ND UART_BAUD
 #endif
+#if XMODEM && (UART_NUM_2ND == UART_NUM)
+  return;
+#endif
+
   uart_init(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, duplex_pin, HALF_DUPLEX_2ND);
 
   boot_start_time = HAL_GetTick();
@@ -309,6 +323,7 @@ static void boot_code(void)
 #if XMODEM
   // Just wait a moment for sync and continue to xmodem
   stk500_check();
+  uart_deinit();
 #else
   /* Infinite loop */
   while (1)
@@ -353,9 +368,7 @@ int main(void)
   MX_GPIO_Init();
   led_state_set(LED_BOOTING);
 
-#if XMODEM && (UART_NUM_2ND != UART_NUM)
   boot_code();
-#endif
 #if XMODEM
   boot_code_xmodem();
 #endif

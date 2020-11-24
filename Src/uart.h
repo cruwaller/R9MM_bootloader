@@ -29,6 +29,7 @@ uart_status uart_transmit_ch(uint8_t data);
 uart_status uart_transmit_bytes(uint8_t *data, uint32_t len);
 
 void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpin, uint8_t halfduplex);
+void uart_deinit(void);
 
 #if defined(DEBUG_UART) && defined(STM32F1)
 void debug_send(uint8_t data);

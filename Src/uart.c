@@ -11,6 +11,8 @@
 #include "main.h"
 #include <string.h>
 
+#define USART_USE_RX_ISR 1
+
 #if USART_USE_LL
 USART_TypeDef *UART_handle;
 #if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
@@ -86,6 +88,12 @@ void debug_send(uint8_t data)
 
 #endif
 
+#if USART_USE_RX_ISR
+#define USART_CR1_FLAGS (USART_CR1_UE | LL_USART_CR1_RXNEIE)
+#else
+#define USART_CR1_FLAGS (USART_CR1_UE)
+#endif
+
 enum
 {
   DUPLEX_RX,
@@ -131,14 +139,14 @@ void duplex_state_set(const uint8_t state)
     switch (state) {
       case DUPLEX_TX:
 #if USART_USE_LL
-        UART_TX_HANDLE->CR1 = USART_CR1_UE | USART_CR1_TE;
+        UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_TE;
 #else
       HAL_HalfDuplex_EnableTransmitter(&UART_TX_HANDLE);
 #endif
         break;
       case DUPLEX_RX:
 #if USART_USE_LL
-        UART_TX_HANDLE->CR1 = USART_CR1_UE | USART_CR1_RE;
+        UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_RE;
 #else
         HAL_HalfDuplex_EnableReceiver(&UART_TX_HANDLE);
 #endif
@@ -151,6 +159,62 @@ void duplex_state_set(const uint8_t state)
     GPIO_WritePin(duplex_port, duplex_pin, ((state == DUPLEX_TX) ^ DUPLEX_INVERTED));
   }
 }
+
+// **************************************************
+#if USART_USE_RX_ISR
+
+uint8_t rx_head, rx_tail;
+uint8_t rx_buffer[256];
+
+int rx_buffer_available(void)
+{
+    uint8_t head = read_u8(&rx_head), tail = read_u8(&rx_tail);
+    return (uint8_t)(head - tail);
+}
+
+int rx_buffer_read(void)
+{
+    if (!rx_buffer_available())
+        return -1;
+    uint8_t tail = read_u8(&rx_tail);
+    write_u8(&rx_tail, tail+1);
+    return rx_buffer[tail++];
+}
+
+// ***********************
+
+void USARTx_IRQ_handler(USART_TypeDef * uart)
+{
+  /* Check for RX data */
+  if (LL_USART_IsActiveFlag_ORE(uart) || LL_USART_IsActiveFlag_RXNE(uart)) {
+    uint8_t next = rx_head;
+    uint8_t data = (uint8_t)LL_USART_ReceiveData8(uart);
+    if ((next + 1) != rx_tail) {
+      rx_buffer[next] = data;
+      rx_head = next + 1;
+    }
+  }
+}
+
+
+void USART1_IRQHandler(void)
+{
+  USARTx_IRQ_handler(USART1);
+}
+void USART2_IRQHandler(void)
+{
+  USARTx_IRQ_handler(USART2);
+}
+#if defined(USART3)
+void USART3_IRQHandler(void)
+{
+  USARTx_IRQ_handler(USART3);
+}
+#endif
+
+#endif // USART_USE_RX_ISR
+
+// **************************************************
 
 
 /**
@@ -167,6 +231,11 @@ uart_status uart_receive(uint8_t *data, uint16_t length)
 uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeout)
 {
 #if USART_USE_LL
+#if !USART_USE_RX_ISR
+  LL_USART_ClearFlag_ORE(UART_handle);
+  LL_USART_ClearFlag_NE(UART_handle);
+  LL_USART_ClearFlag_FE(UART_handle);
+
   uint32_t tickstart = HAL_GetTick();
   while (length--) {
     while (!LL_USART_IsActiveFlag_RXNE(UART_handle)) {
@@ -179,6 +248,21 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
     }
     *data++ = (uint8_t)LL_USART_ReceiveData8(UART_handle);
   }
+#else
+  uint32_t tickstart = HAL_GetTick();
+  while (length--) {
+    while (!rx_buffer_available()) {
+      /* Check for the Timeout */
+      if (timeout != HAL_MAX_DELAY) {
+        if ((timeout == 0U) || ((HAL_GetTick() - tickstart) > timeout)) {
+          return UART_ERROR;
+        }
+      }
+    }
+    *data++ = (uint8_t)rx_buffer_read();
+  }
+#endif
+
   return UART_OK;
 #else
   if (HAL_OK == HAL_UART_Receive(&huart1, data, length, timeout))
@@ -246,10 +330,53 @@ static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, ui
   LL_USART_ConfigAsyncMode(USARTx);
   if (halfduplex)
     LL_USART_EnableHalfDuplex(USARTx);
-  USARTx->CR1 = USART_CR1_UE | dir;
+  USARTx->CR1 = USART_CR1_FLAGS | dir;
   uart_half_duplex = halfduplex;
+
+#if USART_USE_RX_ISR
+  if (USARTx == USART1) {
+    NVIC_SetPriority(USART1_IRQn,
+        NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
+    NVIC_EnableIRQ(USART1_IRQn);
+#ifdef USART2
+  } else if (USARTx == USART2) {
+    NVIC_SetPriority(USART2_IRQn,
+        NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
+    NVIC_EnableIRQ(USART2_IRQn);
+#endif // USART2
+#ifdef USART3
+  } else if (USARTx == USART3) {
+    NVIC_SetPriority(USART3_IRQn,
+        NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
+    NVIC_EnableIRQ(USART3_IRQn);
+#endif // USART3
+  }
+#endif // USART_USE_RX_ISR
 }
 #endif // USART_USE_LL
+
+static void uart_reset(USART_TypeDef * uart_ptr)
+{
+  if (!uart_ptr) return;
+
+  uart_ptr->CR1 = 0;
+    if (uart_ptr == USART1) {
+    __HAL_RCC_USART1_FORCE_RESET();
+    __HAL_RCC_USART1_RELEASE_RESET();
+    __HAL_RCC_USART1_CLK_ENABLE();
+  } else if (uart_ptr == USART2) {
+    __HAL_RCC_USART2_FORCE_RESET();
+    __HAL_RCC_USART2_RELEASE_RESET();
+    __HAL_RCC_USART2_CLK_ENABLE();
+  }
+#if defined(USART3)
+  else if (uart_ptr == USART3) {
+    __HAL_RCC_USART3_FORCE_RESET();
+    __HAL_RCC_USART3_RELEASE_RESET();
+    __HAL_RCC_USART3_CLK_ENABLE();
+  }
+#endif
+}
 
 /**
  * @brief UART Initialization Function
@@ -277,14 +404,9 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   // TX = PA2 [USART2]
 
   /* Reset RX UART */
-  __HAL_RCC_USART1_FORCE_RESET();
-  __HAL_RCC_USART1_RELEASE_RESET();
-  __HAL_RCC_USART1_CLK_ENABLE();
-
+  uart_reset(USART1);
   /* Reset TX UART */
-  __HAL_RCC_USART2_FORCE_RESET();
-  __HAL_RCC_USART2_RELEASE_RESET();
-  __HAL_RCC_USART2_CLK_ENABLE();
+  uart_reset(USART2);
 
   gpio_port_clock((uint32_t)GPIOB);
   gpio_port_clock((uint32_t)GPIOA);
@@ -350,14 +472,9 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   // TX = PA9 [USART1]
 
   /* Reset RX UART */
-  __HAL_RCC_USART3_FORCE_RESET();
-  __HAL_RCC_USART3_RELEASE_RESET();
-  __HAL_RCC_USART3_CLK_ENABLE();
-
+  uart_reset(USART3);
   /* Reset TX UART */
-  __HAL_RCC_USART1_FORCE_RESET();
-  __HAL_RCC_USART1_RELEASE_RESET();
-  __HAL_RCC_USART1_CLK_ENABLE();
+  uart_reset(USART1);
 
   /* UART RX pin config */
   gpio_port_clock((uint32_t)GPIOB);
@@ -457,23 +574,7 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
       return;
   }
 
-  if (uart_ptr == USART1) {
-    __HAL_RCC_USART1_FORCE_RESET();
-    __HAL_RCC_USART1_RELEASE_RESET();
-    __HAL_RCC_USART1_CLK_ENABLE();
-  } else if (uart_ptr == USART2) {
-    __HAL_RCC_USART2_FORCE_RESET();
-    __HAL_RCC_USART2_RELEASE_RESET();
-    __HAL_RCC_USART2_CLK_ENABLE();
-  }
-#if defined(USART3)
-  else if (uart_ptr == USART3) {
-    __HAL_RCC_USART3_FORCE_RESET();
-    __HAL_RCC_USART3_RELEASE_RESET();
-    __HAL_RCC_USART3_CLK_ENABLE();
-  }
-#endif
-
+  uart_reset(uart_ptr);
   gpio_port_clock((uint32_t)gpio_ptr);
 
   if (!halfduplex) {
@@ -586,4 +687,12 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   }
 #endif // USART_USE_LL
 #endif // TARGET_GHOST_RX_V1_2
+}
+
+void uart_deinit(void)
+{
+  if (UART_handle)
+    uart_reset(UART_handle);
+  if (UART_TX_HANDLE && UART_handle != UART_TX_HANDLE)
+    uart_reset(UART_TX_HANDLE);
 }

@@ -125,6 +125,24 @@ void gpio_port_clock(uint32_t port);
 #define XMODEM 1 // Default is XMODEM protocol
 #endif
 
+
+#define barrier() __asm__ __volatile__("": : :"memory")
+
+static inline void write_u8(void *addr, uint8_t val) {
+    barrier();
+    *(volatile uint8_t *)addr = val;
+}
+static inline uint8_t read_u8(const void *addr) {
+    uint8_t val = *(volatile const uint8_t *)addr;
+    barrier();
+    return val;
+}
+
+#if defined(STM32L0xx)
+#define NVIC_EncodePriority(_x, _y, _z) (_y)
+#define NVIC_GetPriorityGrouping() 0
+#endif
+
 #endif /* __MAIN_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
