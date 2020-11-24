@@ -173,7 +173,7 @@ static void boot_code_xmodem(void)
   print_boot_header();
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
-  uart_transmit_str("Send 'bbb' or hold down button\n\r");
+  uart_transmit_str("Send 'bbbb' or hold down button\n\r");
 
 #if 0 // UART ECHO DEBUG
   while(1) {
@@ -188,7 +188,7 @@ static void boot_code_xmodem(void)
   /* Wait input from UART */
   if (uart_receive(header, 5u) == UART_OK) {
     /* Search for magic strings */
-    BLrequested = (strstr((char *)header, "bbb") != NULL) ? 1 : 0;
+    BLrequested = (strstr((char *)header, "bbbb") != NULL) ? 1 : 0;
   }
 
 #if defined(PIN_BUTTON)
@@ -256,13 +256,13 @@ static void boot_code_xmodem(void)
 
         }
       } else {
-        /* Boot cmd => wait 'bbb' */
+        /* Boot cmd => wait 'bbbb' */
         print_boot_header();
         if (uart_receive_timeout(header, 5, 2000U) != UART_OK) {
           BLrequested = 0;
           continue;
         }
-        if (strstr((char *)header, "bbb")) {
+        if (strstr((char *)header, "bbbb")) {
           /* Script ready for upload... */
           break;
         }
