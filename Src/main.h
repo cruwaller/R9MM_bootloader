@@ -59,6 +59,20 @@
 #define GPIO_USE_LL 0
 #endif
 
+#if UART_NUM < 1 || 3 < UART_NUM || (UART_NUM == 3 && !defined(USART3))
+#error "Invalid UART config"
+#endif
+#ifndef UART_AFIO
+#define UART_AFIO 0 // default
+#endif
+#ifndef HALF_DUPLEX
+#define HALF_DUPLEX 0
+#endif
+#ifndef UART_BAUD
+#define UART_BAUD 420000
+#endif
+
+
 /* Private includes ----------------------------------------------------------*/
 
 /* Exported types ------------------------------------------------------------*/
@@ -66,12 +80,6 @@
 /* Exported constants --------------------------------------------------------*/
 
 /* Exported macro ------------------------------------------------------------*/
-
-enum duplex_state
-{
-  DUPLEX_RX,
-  DUPLEX_TX,
-};
 
 enum {
   IO_PORT_A = 'A',
@@ -99,7 +107,6 @@ enum led_states
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 void led_state_set(uint32_t state);
-void duplex_state_set(const enum duplex_state state);
 int8_t boot_wait_timer_end(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin);

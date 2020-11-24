@@ -52,9 +52,10 @@ void *led_green_port;
 uint32_t led_green_pin;
 #endif
 #if defined(DUPLEX_PIN)
-void *duplex_port;
-uint32_t duplex_pin;
-#endif
+static int32_t duplex_pin = IO_CREATE(DUPLEX_PIN);
+#else
+static int32_t duplex_pin = -1;
+#endif // DUPLEX_PIN
 
 #if GPIO_USE_LL
 #define BTN_READ() LL_GPIO_IsInputPinSet(btn_port, btn_pin)
@@ -148,48 +149,40 @@ void led_state_set(uint32_t state)
   ws2812_set_color_u32(val);
 }
 
-void duplex_state_set(const enum duplex_state state)
-{
-#if defined(DUPLEX_PIN)
-  GPIO_WritePin(duplex_port, duplex_pin, (state == DUPLEX_TX));
-#else
-  (void)state;
-#endif
-}
-
 #if XMODEM
 
 static void print_boot_header(void)
 {
   /* Send welcome message on startup. */
-  uart_transmit_str((uint8_t *)"\n\r========== v");
+  uart_transmit_str("\n\r========== v");
 #if defined(BOOTLOADER_VERSION)
-  uart_transmit_str((uint8_t *)BUILD_VERSION(BOOTLOADER_VERSION));
+  uart_transmit_str(BUILD_VERSION(BOOTLOADER_VERSION));
 #endif
-  uart_transmit_str((uint8_t *)" =============\n\r");
-  uart_transmit_str((uint8_t *)"  Bootloader for ExpressLRS\n\r");
-  uart_transmit_str((uint8_t *)"=============================\n\r");
+  uart_transmit_str(" =============\n\r");
+  uart_transmit_str("  Bootloader for ExpressLRS\n\r");
+  uart_transmit_str("=============================\n\r");
 #if defined(MCU_TYPE)
-  uart_transmit_str((uint8_t *)BUILD_MCU_TYPE(MCU_TYPE));
-  uart_transmit_str((uint8_t *)"\n\r");
+  uart_transmit_str(BUILD_MCU_TYPE(MCU_TYPE));
+  uart_transmit_str("\n\r");
 #endif
 }
 
 static void boot_code_xmodem(void)
 {
-  uint32_t ticks;
-  uint8_t BLrequested = 0, ledState = 0;
+  uint8_t BLrequested = 0;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
+
+  uart_init(UART_BAUD, UART_NUM, UART_AFIO, duplex_pin, HALF_DUPLEX);
 
   print_boot_header();
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
-  uart_transmit_str((uint8_t *)"Send '2bl', 'bbb' or hold down button\n\r");
+  uart_transmit_str("Send 'bbb' or hold down button\n\r");
 
   /* Wait input from UART */
   if (uart_receive(header, 5u) == UART_OK) {
     /* Search for magic strings */
-    BLrequested = (strstr((char *)header, "bbb") || strstr((char *)header, "2bl")) ? 1 : 0;
+    BLrequested = (strstr((char *)header, "bbb") != NULL) ? 1 : 0;
   }
 
 #if defined(PIN_BUTTON)
@@ -207,13 +200,15 @@ static void boot_code_xmodem(void)
   {
     /* BL was not requested, RED led on. Use app will soon use the LED's for
      * it's own purpose, thus if RED stays on there is an error */
-    // uart_transmit_str((uint8_t *)"Start app\n\r");
+    // uart_transmit_str("Start app\n\r");
     flash_jump_to_app();
   }
+#if 0
   /* Wait command from uploader script if button was preassed */
   else if (BLrequested == 2) {
     BLrequested = 0;
-    ticks = HAL_GetTick();
+    uint32_t ticks = HAL_GetTick();
+    uint8_t ledState = 0;
     while (1) {
       if (BLrequested < 6) {
         if (1000 <= (HAL_GetTick() - ticks)) {
@@ -268,6 +263,7 @@ static void boot_code_xmodem(void)
       }
     }
   }
+#endif
 
   /* Infinite loop */
   while (1)
@@ -275,25 +271,39 @@ static void boot_code_xmodem(void)
     xmodem_receive();
     /* We only exit the xmodem protocol, if there are any errors.
      * In that case, notify the user and start over. */
-    //uart_transmit_str((uint8_t *)"\n\rFailed... Please try again.\n\r");
+    //uart_transmit_str("\n\rFailed... Please try again.\n\r");
   }
 }
 
-#else // !XMODEM
 #endif /* XMODEM */
 
+#ifndef BOOT_WAIT
 #define BOOT_WAIT 300 // ms
+#endif
 
 static uint32_t boot_start_time;
 
 int8_t boot_wait_timer_end(void)
 {
-  //return 0;
   return (BOOT_WAIT < (HAL_GetTick() - boot_start_time));
 }
 
 static void boot_code(void)
 {
+#ifndef UART_NUM_2ND
+#define UART_NUM_2ND UART_NUM
+#endif
+#ifndef UART_AFIO_2ND
+#define UART_AFIO_2ND UART_AFIO
+#endif
+#ifndef HALF_DUPLEX_2ND
+#define HALF_DUPLEX_2ND HALF_DUPLEX
+#endif
+#ifndef UART_BAUD_2ND
+#define UART_BAUD_2ND UART_BAUD
+#endif
+  uart_init(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, duplex_pin, HALF_DUPLEX_2ND);
+
   boot_start_time = HAL_GetTick();
 
 #if XMODEM
@@ -341,11 +351,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-
-  uart_init();
-
   led_state_set(LED_BOOTING);
+
   boot_code();
+
 #if XMODEM
   boot_code_xmodem();
 #endif
@@ -484,8 +493,7 @@ void SystemClock_Config(void)
 static void MX_GPIO_Init(void)
 {
 #if !GPIO_USE_LL
-#if defined(PIN_BUTTON) || defined(PIN_LED_GREEN) || defined(PIN_LED_RED) ||   \
-    defined(DUPLEX_PIN)
+#if defined(PIN_BUTTON) || defined(PIN_LED_GREEN) || defined(PIN_LED_RED)
   GPIO_InitTypeDef GPIO_InitStruct;
 #endif
 #endif
@@ -544,25 +552,6 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(led_red_port, led_red_pin, GPIO_PIN_RESET);
 #endif // GPIO_USE_LL
 #endif // PIN_LED_RED
-
-#if defined(DUPLEX_PIN)
-  gpio_port_pin_get(IO_CREATE(DUPLEX_PIN), &duplex_port, &duplex_pin);
-  gpio_port_clock((uint32_t)duplex_port);
-#if GPIO_USE_LL
-  LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(duplex_port, duplex_pin, LL_GPIO_OUTPUT_PUSHPULL);
-  LL_GPIO_SetPinSpeed(duplex_port, duplex_pin, LL_GPIO_SPEED_FREQ_LOW);
-  LL_GPIO_ResetOutputPin(duplex_port, duplex_pin);
-#else // GPIO_USE_LL
-  GPIO_InitStruct.Pin = duplex_pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(duplex_port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(duplex_port, duplex_pin, GPIO_PIN_RESET);
-#endif // GPIO_USE_LL
-#endif // DUPLEX_PIN
 
   ws2812_init();
 }

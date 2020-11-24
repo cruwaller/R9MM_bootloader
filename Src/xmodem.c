@@ -90,8 +90,8 @@ void xmodem_receive(void) {
     case X_EOT:
       /* ACK, feedback to user (as a text), then jump to user application. */
       (void)uart_transmit_ch(X_ACK);
-      //(void)uart_transmit_str((uint8_t *)"\n\rFirmware updated!\n\r");
-      //(void)uart_transmit_str((uint8_t *)"Jumping to user application...\n\r");
+      //(void)uart_transmit_str("\n\rFirmware updated!\n\r");
+      //(void)uart_transmit_str("Jumping to user application...\n\r");
       flash_jump_to_app();
       break;
     /* Abort from host. */
