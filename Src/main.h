@@ -55,10 +55,6 @@
 #define BUILD_VERSION(ver) STRINGIFY(ver)
 #define BUILD_MCU_TYPE(type) STRINGIFY(BL_TYPE: type)
 
-#ifndef GPIO_USE_LL
-#define GPIO_USE_LL 0
-#endif
-
 #if UART_NUM < 1 || 3 < UART_NUM || (UART_NUM == 3 && !defined(USART3))
 #error "Invalid UART config"
 #endif
@@ -112,13 +108,9 @@ int8_t boot_wait_timer_end(void);
 void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin);
 void gpio_port_clock(uint32_t port);
 
-#if GPIO_USE_LL
 #define GPIO_WritePin(port, pin, _state) \
   (_state) ? LL_GPIO_SetOutputPin(port, pin) : \
   LL_GPIO_ResetOutputPin(port, pin)
-#else
-#define GPIO_WritePin(...) HAL_GPIO_WritePin(__VA_ARGS__)
-#endif
 
 /* Private defines -----------------------------------------------------------*/
 #if !defined(XMODEM) && !STK500 && !FRSKY

@@ -57,11 +57,7 @@ static int32_t duplex_pin = IO_CREATE(DUPLEX_PIN);
 static int32_t duplex_pin = -1;
 #endif // DUPLEX_PIN
 
-#if GPIO_USE_LL
 #define BTN_READ() LL_GPIO_IsInputPinSet(btn_port, btn_pin)
-#else
-#define BTN_READ() HAL_GPIO_ReadPin(btn_port, btn_pin)
-#endif
 #ifndef BUTTON_INVERTED
 #define BUTTON_INVERTED   1
 #endif // BUTTON_INVERTED
@@ -506,65 +502,31 @@ void SystemClock_Config(void)
  */
 static void MX_GPIO_Init(void)
 {
-#if !GPIO_USE_LL
-#if defined(PIN_BUTTON) || defined(PIN_LED_GREEN) || defined(PIN_LED_RED)
-  GPIO_InitTypeDef GPIO_InitStruct;
-#endif
-#endif
 
 #if defined(PIN_BUTTON)
   gpio_port_pin_get(IO_CREATE(PIN_BUTTON), &btn_port, &btn_pin);
   gpio_port_clock((uint32_t)btn_port);
-#if GPIO_USE_LL
   LL_GPIO_SetPinMode(btn_port, btn_pin, LL_GPIO_MODE_INPUT);
   LL_GPIO_SetPinPull(btn_port, btn_pin,
                      BUTTON_INVERTED ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN);
-#else // GPIO_USE_LL
-  /*Configure GPIO pin : BTN_Pin */
-  GPIO_InitStruct.Pin = btn_pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = BUTTON_INVERTED ? GPIO_PULLUP : GPIO_PULLDOWN;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(btn_port, &GPIO_InitStruct);
-#endif // GPIO_USE_LL
 #endif // PIN_BUTTON
 
 #if defined(PIN_LED_GREEN)
   gpio_port_pin_get(IO_CREATE(PIN_LED_GREEN), &led_green_port, &led_green_pin);
   gpio_port_clock((uint32_t)led_green_port);
-#if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_green_port, led_green_pin, LL_GPIO_MODE_OUTPUT);
   LL_GPIO_SetPinOutputType(led_green_port, led_green_pin, LL_GPIO_OUTPUT_PUSHPULL);
   LL_GPIO_SetPinSpeed(led_green_port, led_green_pin, LL_GPIO_SPEED_FREQ_LOW);
   LL_GPIO_ResetOutputPin(led_green_port, led_green_pin);
-#else // GPIO_USE_LL
-  GPIO_InitStruct.Pin = led_green_pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(led_green_port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(led_green_port, led_green_pin, GPIO_PIN_RESET);
-#endif // GPIO_USE_LL
 #endif // PIN_LED_GREEN
 
 #if defined(PIN_LED_RED)
   gpio_port_pin_get(IO_CREATE(PIN_LED_RED), &led_red_port, &led_red_pin);
   gpio_port_clock((uint32_t)led_red_port);
-#if GPIO_USE_LL
   LL_GPIO_SetPinMode(led_red_port, led_red_pin, LL_GPIO_MODE_OUTPUT);
   LL_GPIO_SetPinOutputType(led_red_port, led_red_pin, LL_GPIO_OUTPUT_PUSHPULL);
   LL_GPIO_SetPinSpeed(led_red_port, led_red_pin, LL_GPIO_SPEED_FREQ_LOW);
   LL_GPIO_ResetOutputPin(led_red_port, led_red_pin);
-#else // GPIO_USE_LL
-  GPIO_InitStruct.Pin = led_red_pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(led_red_port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(led_red_port, led_red_pin, GPIO_PIN_RESET);
-#endif // GPIO_USE_LL
 #endif // PIN_LED_RED
 
   ws2812_init();

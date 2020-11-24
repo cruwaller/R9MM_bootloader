@@ -45,21 +45,10 @@ void duplex_setup_pin(int32_t pin)
 
   gpio_port_pin_get(pin, &duplex_port, &duplex_pin);
   gpio_port_clock((uint32_t)duplex_port);
-#if GPIO_USE_LL
   LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);
   LL_GPIO_SetPinOutputType(duplex_port, duplex_pin, LL_GPIO_OUTPUT_PUSHPULL);
   LL_GPIO_SetPinSpeed(duplex_port, duplex_pin, LL_GPIO_SPEED_FREQ_LOW);
   LL_GPIO_ResetOutputPin(duplex_port, duplex_pin);
-#else // GPIO_USE_LL
-  GPIO_InitTypeDef GPIO_InitStruct;
-  GPIO_InitStruct.Pin = duplex_pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(duplex_port, &GPIO_InitStruct);
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(duplex_port, duplex_pin, GPIO_PIN_RESET);
-#endif // GPIO_USE_LL
 }
 
 #ifndef DUPLEX_INVERTED
@@ -294,10 +283,6 @@ static void uart_reset(USART_TypeDef * uart_ptr)
  */
 void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpin, uint8_t halfduplex)
 {
-#if !GPIO_USE_LL
-  GPIO_InitTypeDef GPIO_InitStruct;
-#endif
-
 #if TARGET_GHOST_RX_V1_2
   (void)duplexpin;
   (void)halfduplex;
@@ -311,7 +296,6 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
 
   gpio_port_clock((uint32_t)GPIOB);
   gpio_port_clock((uint32_t)GPIOA);
-#if GPIO_USE_LL
   LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_6, LL_GPIO_MODE_ALTERNATE);
   LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_6, LL_GPIO_SPEED_FREQ_HIGH);
   LL_GPIO_SetPinPull(GPIOB, LL_GPIO_PIN_6, LL_GPIO_PULL_UP);
@@ -322,19 +306,6 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_2, LL_GPIO_SPEED_FREQ_HIGH);
   LL_GPIO_SetPinPull(GPIOA, LL_GPIO_PIN_2, LL_GPIO_PULL_UP);
   LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_2, LL_GPIO_AF_7);
-#else // !GPIO_USE_LL
-  /* Init RX pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_6;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /* Init TX pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_2;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-#endif // GPIO_USE_LL
 
   usart_hw_init(USART2, baud, USART_CR1_TE, 1); // TX, half duplex
   UART_TX_HANDLE = USART2;
@@ -381,18 +352,18 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
       switch (afio) {
         case 1:
           gpio_ptr = GPIOB;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_7 : GPIO_PIN_7);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_6 : GPIO_PIN_6);
+          pin_rx = LL_GPIO_PIN_7;
+          pin_tx = LL_GPIO_PIN_6;
           break;
         case 2:
           gpio_ptr = GPIOC;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_5 : GPIO_PIN_5);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4);
+          pin_rx = LL_GPIO_PIN_5;
+          pin_tx = LL_GPIO_PIN_4;
           break;
         default:
           gpio_ptr = GPIOA;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_9  : GPIO_PIN_9);
+          pin_rx = LL_GPIO_PIN_10;
+          pin_tx = LL_GPIO_PIN_9;
           break;
       }
       break;
@@ -404,19 +375,19 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
         case 1:
           /* JTAG pins. Need remapping! */
           gpio_ptr = GPIOA;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_15 : GPIO_PIN_15);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_14 : GPIO_PIN_14);
+          pin_rx = LL_GPIO_PIN_15;
+          pin_tx = LL_GPIO_PIN_14;
           break;
         case 2:
           /* JTAG pins. Need remapping! */
           gpio_ptr = GPIOB;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_4 : GPIO_PIN_4);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3);
+          pin_rx = LL_GPIO_PIN_4;
+          pin_tx = LL_GPIO_PIN_3;
           break;
         default:
           gpio_ptr = GPIOA;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_3 : GPIO_PIN_3);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_2 : GPIO_PIN_2);
+          pin_rx = LL_GPIO_PIN_3;
+          pin_tx = LL_GPIO_PIN_2;
           break;
       }
       break;
@@ -428,18 +399,18 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
       switch (afio) {
         case 1:
           gpio_ptr = GPIOB;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_8 : GPIO_PIN_8);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_9 : GPIO_PIN_9);
+          pin_rx = LL_GPIO_PIN_8;
+          pin_tx = LL_GPIO_PIN_9;
           break;
         case 2:
           gpio_ptr = GPIOC;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
+          pin_rx = LL_GPIO_PIN_11;
+          pin_tx = LL_GPIO_PIN_10;
           break;
         default:
           gpio_ptr = GPIOB;
-          pin_rx = (GPIO_USE_LL ? LL_GPIO_PIN_11 : GPIO_PIN_11);
-          pin_tx = (GPIO_USE_LL ? LL_GPIO_PIN_10 : GPIO_PIN_10);
+          pin_rx = LL_GPIO_PIN_11;
+          pin_tx = LL_GPIO_PIN_10;
           break;
       }
       break;
@@ -458,7 +429,6 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
     dir = USART_CR1_RE | USART_CR1_TE;
 
     /* RX pin */
-#if GPIO_USE_LL
 #if defined(STM32L0xx)
     LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_ALTERNATE);
     if (uart_ptr == USART1 && pin_rx == LL_GPIO_PIN_7) {
@@ -501,43 +471,6 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
     LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_tx, LL_GPIO_AF_7);
   }
 #endif
-
-#else // !GPIO_USE_LL
-  /* RX pin */
-  GPIO_InitStruct.Pin = pin_rx;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-#if defined(STM32L0xx)
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  if (uart_ptr == USART1 && pin_rx == GPIO_PIN_7) {
-    GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
-  } else {
-    GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
-  }
-#elif defined(STM32L4xx) || defined(STM32F3xx)
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-#else
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-#endif
-  HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
-
-  /* TX pin */
-  GPIO_InitStruct.Pin = pin_tx;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-#if defined(STM32L0xx)
-  if (uart_ptr == USART1 && pin_tx == GPIO_PIN_6) {
-    GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
-  } else {
-    GPIO_InitStruct.Alternate = GPIO_AF4_USART1;
-  }
-#elif defined(STM32L4xx) || defined(STM32F3xx)
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-#endif
-  HAL_GPIO_Init(gpio_ptr, &GPIO_InitStruct);
-#endif // GPIO_USE_LL
 
   duplex_setup_pin(duplexpin);
   duplex_state_set(DUPLEX_RX);
