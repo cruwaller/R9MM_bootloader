@@ -272,12 +272,11 @@ static void boot_code_xmodem(void)
 #endif
 
   /* Infinite loop */
-  while (1)
-  {
+  while (1) {
     xmodem_receive();
     /* We only exit the xmodem protocol, if there are any errors.
      * In that case, notify the user and start over. */
-    //uart_transmit_str("\n\rFailed... Please try again.\n\r");
+    uart_transmit_str("\n\rFailed... Please try again.\n\r");
   }
 }
 
@@ -481,7 +480,11 @@ void SystemClock_Config(void)
 #if defined(STM32F3xx)
   RCC_PeriphCLKInitTypeDef PeriphClkInit;
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+#if defined(RCC_USART1CLKSOURCE_PCLK2)
+  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
+#else
   PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
+#endif
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
     Error_Handler();
   }

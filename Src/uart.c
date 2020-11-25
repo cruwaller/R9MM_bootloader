@@ -144,13 +144,14 @@ uart_status uart_receive(uint8_t *data, uint16_t length)
 
 uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeout)
 {
+  uint32_t tickstart;
 #if !USART_USE_RX_ISR
   LL_USART_ClearFlag_ORE(UART_handle);
   LL_USART_ClearFlag_NE(UART_handle);
   LL_USART_ClearFlag_FE(UART_handle);
 
-  uint32_t tickstart = HAL_GetTick();
   while (length--) {
+    tickstart = HAL_GetTick();
     while (!LL_USART_IsActiveFlag_RXNE(UART_handle)) {
       /* Check for the Timeout */
       if (timeout != HAL_MAX_DELAY) {
@@ -162,8 +163,8 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
     *data++ = (uint8_t)LL_USART_ReceiveData8(UART_handle);
   }
 #else
-  uint32_t tickstart = HAL_GetTick();
   while (length--) {
+    tickstart = HAL_GetTick();
     while (!rx_buffer_available()) {
       /* Check for the Timeout */
       if (timeout != HAL_MAX_DELAY) {
@@ -219,6 +220,21 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   return status;
 }
 
+static IRQn_Type usart_get_irq(USART_TypeDef *USARTx)
+{
+  if (USARTx == USART1) {
+    return USART1_IRQn;
+  } else if (USARTx == USART2) {
+    return USART2_IRQn;
+#if defined(USART3)
+  } else if (USARTx == USART3) {
+    return USART3_IRQn;
+#endif // USART3
+  }
+  return 0;
+}
+
+
 static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, uint8_t halfduplex) {
   uint32_t pclk = SystemCoreClock / 2;
 #if defined(STM32F1)
@@ -233,23 +249,10 @@ static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, ui
   uart_half_duplex = halfduplex;
 
 #if USART_USE_RX_ISR
-  if (USARTx == USART1) {
-    NVIC_SetPriority(USART1_IRQn,
-        NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
-    NVIC_EnableIRQ(USART1_IRQn);
-#ifdef USART2
-  } else if (USARTx == USART2) {
-    NVIC_SetPriority(USART2_IRQn,
-        NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
-    NVIC_EnableIRQ(USART2_IRQn);
-#endif // USART2
-#ifdef USART3
-  } else if (USARTx == USART3) {
-    NVIC_SetPriority(USART3_IRQn,
-        NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
-    NVIC_EnableIRQ(USART3_IRQn);
-#endif // USART3
-  }
+  IRQn_Type irq = usart_get_irq(USARTx);
+  NVIC_SetPriority(irq,
+      NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
+  NVIC_EnableIRQ(irq);
 #endif // USART_USE_RX_ISR
 }
 
@@ -258,7 +261,13 @@ static void uart_reset(USART_TypeDef * uart_ptr)
   if (!uart_ptr) return;
 
   uart_ptr->CR1 = 0;
-    if (uart_ptr == USART1) {
+
+#if USART_USE_RX_ISR
+  IRQn_Type irq = usart_get_irq(uart_ptr);
+  NVIC_DisableIRQ(irq);
+#endif
+
+  if (uart_ptr == USART1) {
     __HAL_RCC_USART1_FORCE_RESET();
     __HAL_RCC_USART1_RELEASE_RESET();
     __HAL_RCC_USART1_CLK_ENABLE();
@@ -266,14 +275,13 @@ static void uart_reset(USART_TypeDef * uart_ptr)
     __HAL_RCC_USART2_FORCE_RESET();
     __HAL_RCC_USART2_RELEASE_RESET();
     __HAL_RCC_USART2_CLK_ENABLE();
-  }
 #if defined(USART3)
-  else if (uart_ptr == USART3) {
+  } else if (uart_ptr == USART3) {
     __HAL_RCC_USART3_FORCE_RESET();
     __HAL_RCC_USART3_RELEASE_RESET();
     __HAL_RCC_USART3_CLK_ENABLE();
-  }
 #endif
+  }
 }
 
 /**
@@ -484,6 +492,8 @@ void uart_deinit(void)
 {
   if (UART_handle)
     uart_reset(UART_handle);
+#if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
   if (UART_TX_HANDLE && UART_handle != UART_TX_HANDLE)
     uart_reset(UART_TX_HANDLE);
+#endif
 }
