@@ -175,13 +175,17 @@ static void boot_code_xmodem(void)
    * otherwise stay in the bootloader. */
   uart_transmit_str("Send 'bbbb' or hold down button\n\r");
 
+
 #if 0 // UART ECHO DEBUG
+  uint8_t _led_tmp = 0;
   while(1) {
-    if (uart_receive_timeout(header, 5u, 10000) == UART_OK) {
-      uart_transmit_bytes(header, 5);
+    if (uart_receive_timeout(header, 1u, 1000) == UART_OK) {
+      uart_transmit_bytes(header, 1);
     } else {
       uart_transmit_ch('F');
     }
+    led_state_set(_led_tmp ? LED_FLASHING : LED_FLASHING_ALT);
+    _led_tmp ^= 1;
   }
 #endif
 

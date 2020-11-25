@@ -1,5 +1,6 @@
 {
   "build": {
+    "core": "stm32",
     "cpu": "cortex-m4",
     "extra_flags": "-DSTM32F303xC=1 -DSTM32F3xx=1 -DSTM32F303=1",
     "f_cpu": "72000000L",
@@ -14,11 +15,8 @@
     "default_tools": [
       "stlink"
     ],
-    "jlink_device": "STM32F303K8",
-    "onboard_tools": [
-      "stlink"
-    ],
-    "openocd_board": "st_nucleo_f3",
+    "jlink_device": "STM32F303CC",
+    "openocd_target": "stm32f3x",
     "svd_path": "STM32F30x.svd"
   },
   "frameworks": [
@@ -29,7 +27,7 @@
   ],
   "name": "STM32F303CC",
   "upload": {
-    "maximum_ram_size": 49152,
+    "maximum_ram_size": 40960,
     "maximum_size": 262144,
     "protocol": "stlink",
     "protocols": [
@@ -39,6 +37,6 @@
       "mbed"
     ]
   },
-  "url": "wtf",
+  "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f303cc.html",
   "vendor": "ST"
 }
