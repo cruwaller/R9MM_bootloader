@@ -82,9 +82,12 @@ void xmodem_receive(void) {
       }
       /* End of Transmission. */
       case X_EOT:
-        /* ACK, feedback to user (as a text), then jump to user application. */
-        (void)uart_transmit_ch(X_ACK);
-        flash_jump_to_app();
+        if (x_first_packet_received) {
+          /* ACK, feedback to user (as a text), then jump to user application. */
+          (void)uart_transmit_ch(X_ACK);
+          flash_jump_to_app();
+        }
+        status = X_ERROR; // Restart sequence
         break;
       /* Abort from host. */
       case X_CAN:
