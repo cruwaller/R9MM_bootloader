@@ -11,7 +11,12 @@
 #include "main.h"
 #include <string.h>
 
+#if defined(STM32L4xx)
+// FIXME: UART ISR causes xmodem failure
+#define USART_USE_RX_ISR 0
+#else
 #define USART_USE_RX_ISR 1
+#endif
 
 USART_TypeDef *UART_handle;
 #if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
@@ -272,6 +277,7 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   return status;
 }
 
+#if USART_USE_RX_ISR
 static IRQn_Type usart_get_irq(USART_TypeDef *USARTx)
 {
   if (USARTx == USART1) {
@@ -285,7 +291,7 @@ static IRQn_Type usart_get_irq(USART_TypeDef *USARTx)
   }
   return 0;
 }
-
+#endif
 
 static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, uint8_t halfduplex) {
   uint32_t pclk = SystemCoreClock / 2;

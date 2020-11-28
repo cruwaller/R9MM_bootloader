@@ -150,11 +150,11 @@ void led_state_set(uint32_t state)
 static void print_boot_header(void)
 {
   /* Send welcome message on startup. */
-  uart_transmit_str("\n\r========== v");
+  uart_transmit_str("\n\r========= v");
 #if defined(BOOTLOADER_VERSION)
   uart_transmit_str(BUILD_VERSION(BOOTLOADER_VERSION));
 #endif
-  uart_transmit_str(" =============\n\r");
+  uart_transmit_str(" ============\n\r");
   uart_transmit_str("  Bootloader for ExpressLRS\n\r");
   uart_transmit_str("=============================\n\r");
 #if defined(MCU_TYPE)
