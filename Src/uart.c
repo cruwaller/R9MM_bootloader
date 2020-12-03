@@ -62,7 +62,7 @@ void duplex_setup_pin(int32_t pin)
 
 void duplex_state_set(const uint8_t state)
 {
-  if (uart_half_duplex) {
+  if (uart_half_duplex || duplex_port) {
     switch (state) {
       case DUPLEX_TX:
         UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_TE;
@@ -492,10 +492,11 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   usart_tx_pin_config(gpio_ptr, pin_tx);
   /* Duplex pin */
   duplex_setup_pin(duplexpin);
-  duplex_state_set(DUPLEX_RX);
   /* Usart peripheral config */
   UART_handle = uart_ptr;
   usart_hw_init(uart_ptr, baud, dir, halfduplex);
+  /* Enable RX by default */
+  duplex_state_set(DUPLEX_RX);
 #endif // TARGET_GHOST_RX_V1_2
 }
 
