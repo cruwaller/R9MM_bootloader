@@ -163,7 +163,7 @@ static void print_boot_header(void)
 #endif
 }
 
-static void boot_code_xmodem(void)
+static int8_t boot_code_xmodem(void)
 {
   uint8_t BLrequested = 0;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
@@ -206,13 +206,10 @@ static void boot_code_xmodem(void)
   }
 #endif /* PIN_BUTTON */
 
-  if (!BLrequested)
-  {
-    /* BL was not requested, RED led on. Use app will soon use the LED's for
-     * it's own purpose, thus if RED stays on there is an error */
-    // uart_transmit_str("Start app\n\r");
-    flash_jump_to_app();
+  if (!BLrequested) {
+    return -1;
   }
+
 #if 0
   /* Wait command from uploader script if button was preassed */
   else if (BLrequested == 2) {
@@ -282,9 +279,11 @@ static void boot_code_xmodem(void)
      * In that case, notify the user and start over. */
     uart_transmit_str("\n\rFailed... Please try again.\n\r");
   }
-}
 
+  return 0;
+}
 #endif /* XMODEM */
+
 
 #ifndef BOOT_WAIT
 #define BOOT_WAIT 300 // ms
@@ -297,49 +296,24 @@ int8_t boot_wait_timer_end(void)
   return (BOOT_WAIT < (HAL_GetTick() - boot_start_time));
 }
 
-static void boot_code(void)
+int8_t boot_code_stk(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpin, uint8_t halfduplex)
 {
-#ifndef UART_NUM_2ND
-#define UART_NUM_2ND UART_NUM
-#endif
-#ifndef UART_AFIO_2ND
-#define UART_AFIO_2ND UART_AFIO
-#endif
-#ifndef HALF_DUPLEX_2ND
-#define HALF_DUPLEX_2ND HALF_DUPLEX
-#endif
-#ifndef UART_BAUD_2ND
-#define UART_BAUD_2ND UART_BAUD
-#endif
-#if XMODEM && (UART_NUM_2ND == UART_NUM)
-  return;
-#endif
+  int8_t ret = 0;
 
-  uart_init(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, duplex_pin, HALF_DUPLEX_2ND);
+  uart_init(baud, uart_idx, afio, duplexpin, halfduplex);
 
   boot_start_time = HAL_GetTick();
 
-#if XMODEM
-  // Just wait a moment for sync and continue to xmodem
-  stk500_check();
-  uart_deinit();
-#else
-  /* Infinite loop */
-  while (1)
-  {
-    /* Check if update is requested */
-    if (
+  while (0 <= ret) {
 #if STK500
-        stk500_check() < 0
+    ret = stk500_check();
 #else
-        frsky_check() < 0
+    ret = frsky_check();
 #endif
-    )
-    {
-      flash_jump_to_app();
-    }
   }
-#endif
+  uart_deinit();
+
+  return ret;
 }
 
 
@@ -367,10 +341,39 @@ int main(void)
   MX_GPIO_Init();
   led_state_set(LED_BOOTING);
 
-  boot_code();
-#if XMODEM
-  boot_code_xmodem();
+  int8_t ret = 0;
+
+#ifndef UART_AFIO_2ND
+#define UART_AFIO_2ND UART_AFIO
 #endif
+#ifndef HALF_DUPLEX_2ND
+#define HALF_DUPLEX_2ND HALF_DUPLEX
+#endif
+#ifndef UART_BAUD_2ND
+#define UART_BAUD_2ND UART_BAUD
+#endif
+
+#if XMODEM
+#if defined(UART_NUM_2ND) && (UART_NUM_2ND != UART_NUM)
+  ret = boot_code_stk(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, duplex_pin, HALF_DUPLEX_2ND);
+  if (ret < 0) // timeout, start xmodem
+#endif
+  ret = boot_code_xmodem();
+#else /* !XMODEM */
+  ret = boot_code_stk(UART_BAUD, UART_NUM, UART_AFIO, duplex_pin, HALF_DUPLEX);
+#if defined(UART_NUM_2ND) && (UART_NUM_2ND != UART_NUM)
+  if (ret < 0) {
+    ret = boot_code_stk(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, -1, HALF_DUPLEX_2ND);
+  }
+#endif
+#endif/* XMODEM */
+
+  if (ret < 0) {
+    flash_jump_to_app();
+  }
+
+  // Reset system if something went wrong
+  NVIC_SystemReset();
 }
 
 
