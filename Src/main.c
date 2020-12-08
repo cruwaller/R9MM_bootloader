@@ -499,6 +499,7 @@ void SystemClock_Config(void)
   __HAL_RCC_AFIO_CLK_ENABLE();
   /** NOJTAG: JTAG-DP Disabled and SW-DP Enabled */
   __HAL_AFIO_REMAP_SWJ_NOJTAG();
+  //__HAL_AFIO_REMAP_SWJ_DISABLE()
 #endif
 #endif
 
