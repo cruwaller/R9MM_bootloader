@@ -57,10 +57,10 @@ static int32_t duplex_pin = IO_CREATE(DUPLEX_PIN);
 static int32_t duplex_pin = -1;
 #endif // DUPLEX_PIN
 
-#define BTN_READ() LL_GPIO_IsInputPinSet(btn_port, btn_pin)
 #ifndef BUTTON_INVERTED
 #define BUTTON_INVERTED   1
 #endif // BUTTON_INVERTED
+#define BTN_READ() (GPIO_ReadPin(btn_port, btn_pin) ^ BUTTON_INVERTED)
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -70,11 +70,7 @@ static void MX_GPIO_Init(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin)
 {
-  uint32_t _pin = 0x1 << IO_GET_PIN(io);
-#if defined(STM32F1) && defined(GPIO_PIN_MASK_POS)
-  _pin = (_pin << GPIO_PIN_MASK_POS) | ((_pin < 0x100) ? _pin : (0x04000000 | (0x1 << (_pin - 8))));
-#endif
-  *pin = _pin;
+  *pin = IO_GET_PIN(io);
   io = IO_GET_PORT(io);
   *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
 }
@@ -114,6 +110,90 @@ void gpio_port_clock(uint32_t port)
     }
 }
 
+void GPIO_SetupPin(GPIO_TypeDef *regs, uint32_t pos, uint32_t mode, int pullup)
+{
+  gpio_port_clock((uint32_t)regs);
+
+#if defined(STM32F1)
+  // Configure GPIO
+  uint32_t shift = (pos % 8) * 4, msk = 0xf << shift, cfg;
+
+  if (mode == GPIO_INPUT) {
+    cfg = pullup ? 0x8 : 0x4;
+  } else if (mode == GPIO_OUTPUT) {
+    cfg = 0x1; // push-pull, 0b00 | max speed 2 MHz, 0b01
+  } else if (mode == (GPIO_OUTPUT | GPIO_OPEN_DRAIN)) {
+    cfg = 0x5; // Open-drain, 0b01 | max speed 2 MHz, 0b01
+  } else if (mode == GPIO_ANALOG) {
+    cfg = 0x0;
+  } else {
+    // Alternate function
+    if (mode & GPIO_OPEN_DRAIN)
+      // output open-drain mode, 10MHz
+      cfg = 0xd;
+      // output open-drain mode, 50MHz
+      //cfg = 0xF;
+    else if (pullup > 0)
+      // input pins use GPIO_INPUT mode on the stm32f1
+      cfg = 0x8;
+    else
+      // output push-pull mode, 10MHz
+      cfg = 0x9;
+      // output push-pull mode, 50MHz
+      //cfg = 0xB;
+  }
+  if (pos & 0x8)
+    regs->CRH = (regs->CRH & ~msk) | (cfg << shift);
+  else
+    regs->CRL = (regs->CRL & ~msk) | (cfg << shift);
+
+  if (pullup > 0)
+    regs->BSRR = 1 << pos;
+  else if (pullup < 0)
+    regs->BSRR = 1 << (pos + 16);
+#else
+  uint32_t bit_pos = 0x1 << pos;
+  if (mode == GPIO_INPUT) {
+    LL_GPIO_SetPinMode(regs, bit_pos, LL_GPIO_MODE_INPUT);
+    LL_GPIO_SetPinPull(regs, bit_pos, (0 < pullup ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN));
+  } else if (mode == GPIO_OUTPUT) {
+    LL_GPIO_SetPinMode(regs, bit_pos, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(regs, bit_pos, LL_GPIO_OUTPUT_PUSHPULL);
+    //LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_LOW);
+    LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_MEDIUM);
+    LL_GPIO_ResetOutputPin(regs, bit_pos);
+  } else {
+    mode >>= 4;
+    LL_GPIO_SetPinMode(regs, bit_pos, LL_GPIO_MODE_ALTERNATE);
+//#if defined(STM32L0xx)
+//#elif defined(STM32L4xx) || defined(STM32F3xx)
+    LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_HIGH);
+//#else
+//#error "Not implemented!"
+//#endif
+    if (pos & 8) {
+      LL_GPIO_SetAFPin_0_7(regs, bit_pos, mode);
+    } else {
+      LL_GPIO_SetAFPin_8_15(regs, bit_pos, mode);
+    }
+    LL_GPIO_SetPinPull(regs, bit_pos, (0 < pullup ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN));
+  }
+#endif
+}
+
+void GPIO_WritePin(GPIO_TypeDef *regs, uint32_t pos, uint32_t state)
+{
+  if (state)
+    regs->BSRR = 1 << pos;
+  else
+    regs->BSRR = 1 << (pos + 16);
+}
+
+uint8_t GPIO_ReadPin(GPIO_TypeDef *regs, uint32_t pos)
+{
+  return !!(regs->IDR & (0x1 << pos));
+}
+
 void led_state_set(uint32_t state)
 {
   uint32_t val;
@@ -136,7 +216,7 @@ void led_state_set(uint32_t state)
   };
 
 #if defined(PIN_LED_RED)
-  GPIO_WritePin(led_red_port, led_red_pin, !!(uint8_t)val);
+  GPIO_WritePin(led_red_port, led_red_pin, (!!(uint8_t)val));
 #endif
 #if defined(PIN_LED_GREEN)
   GPIO_WritePin(led_green_port, led_green_pin, !!(uint8_t)(val >> 8));
@@ -197,9 +277,9 @@ static int8_t boot_code_xmodem(void)
 
 #if defined(PIN_BUTTON)
   // Wait button press to access bootloader
-  if (!BLrequested && (!!BTN_READ() ^ BUTTON_INVERTED)) {
+  if (!BLrequested && BTN_READ()) {
     HAL_Delay(200); // wait debounce
-    if ((!!BTN_READ() ^ BUTTON_INVERTED)) {
+    if (BTN_READ()) {
       // Button still pressed
       BLrequested = 2;
     }
@@ -339,6 +419,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+
   led_state_set(LED_BOOTING);
 
   int8_t ret = 0;
@@ -499,7 +580,7 @@ void SystemClock_Config(void)
   __HAL_RCC_AFIO_CLK_ENABLE();
   /** NOJTAG: JTAG-DP Disabled and SW-DP Enabled */
   __HAL_AFIO_REMAP_SWJ_NOJTAG();
-  //__HAL_AFIO_REMAP_SWJ_DISABLE()
+  __HAL_AFIO_REMAP_SWJ_DISABLE();
 #endif
 #endif
 
@@ -513,31 +594,19 @@ void SystemClock_Config(void)
  */
 static void MX_GPIO_Init(void)
 {
-
 #if defined(PIN_BUTTON)
   gpio_port_pin_get(IO_CREATE(PIN_BUTTON), &btn_port, &btn_pin);
-  gpio_port_clock((uint32_t)btn_port);
-  LL_GPIO_SetPinMode(btn_port, btn_pin, LL_GPIO_MODE_INPUT);
-  LL_GPIO_SetPinPull(btn_port, btn_pin,
-                     BUTTON_INVERTED ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN);
+  GPIO_SetupPin(btn_port, btn_pin, GPIO_INPUT, (BUTTON_INVERTED ? 1 : -1));
 #endif // PIN_BUTTON
 
 #if defined(PIN_LED_GREEN)
   gpio_port_pin_get(IO_CREATE(PIN_LED_GREEN), &led_green_port, &led_green_pin);
-  gpio_port_clock((uint32_t)led_green_port);
-  LL_GPIO_SetPinMode(led_green_port, led_green_pin, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(led_green_port, led_green_pin, LL_GPIO_OUTPUT_PUSHPULL);
-  LL_GPIO_SetPinSpeed(led_green_port, led_green_pin, LL_GPIO_SPEED_FREQ_LOW);
-  LL_GPIO_ResetOutputPin(led_green_port, led_green_pin);
+  GPIO_SetupPin(led_green_port, led_green_pin, GPIO_OUTPUT, -1);
 #endif // PIN_LED_GREEN
 
 #if defined(PIN_LED_RED)
   gpio_port_pin_get(IO_CREATE(PIN_LED_RED), &led_red_port, &led_red_pin);
-  gpio_port_clock((uint32_t)led_red_port);
-  LL_GPIO_SetPinMode(led_red_port, led_red_pin, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(led_red_port, led_red_pin, LL_GPIO_OUTPUT_PUSHPULL);
-  LL_GPIO_SetPinSpeed(led_red_port, led_red_pin, LL_GPIO_SPEED_FREQ_LOW);
-  LL_GPIO_ResetOutputPin(led_red_port, led_red_pin);
+  GPIO_SetupPin(led_red_port, led_red_pin, GPIO_OUTPUT, -1);
 #endif // PIN_LED_RED
 
   ws2812_init();

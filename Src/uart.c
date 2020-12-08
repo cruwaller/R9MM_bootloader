@@ -49,11 +49,7 @@ void duplex_setup_pin(int32_t pin)
     return;
 
   gpio_port_pin_get(pin, &duplex_port, &duplex_pin);
-  gpio_port_clock((uint32_t)duplex_port);
-  LL_GPIO_SetPinMode(duplex_port, duplex_pin, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(duplex_port, duplex_pin, LL_GPIO_OUTPUT_PUSHPULL);
-  LL_GPIO_SetPinSpeed(duplex_port, duplex_pin, LL_GPIO_SPEED_FREQ_LOW);
-  LL_GPIO_ResetOutputPin(duplex_port, duplex_pin);
+  GPIO_SetupPin(duplex_port, duplex_pin, GPIO_OUTPUT, -1);
 }
 
 #ifndef DUPLEX_INVERTED
@@ -79,56 +75,22 @@ void duplex_state_set(const uint8_t state)
   }
 }
 
-void usart_rx_pin_config(GPIO_TypeDef *gpio_ptr, uint32_t pin_rx)
+void usart_pin_config(GPIO_TypeDef *gpio_ptr, uint32_t pin)
 {
-  /* RX pin */
+  uint32_t fn = 0;
 #if defined(STM32L0xx)
-  LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_ALTERNATE);
-  if (gpio_ptr == GPIOB && pin_rx == LL_GPIO_PIN_7) {
+  if (gpio_ptr == GPIOB &&
+      (pin == 6 || pin == 7)) {
     // USART1 is AF0
-    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_rx, LL_GPIO_AF_0);
-  } else if (pin_rx <= LL_GPIO_PIN_7) {
-    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_rx, LL_GPIO_AF_4);
+    fn = 0;
   } else {
-    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_rx, LL_GPIO_AF_4);
+    fn = 4;
   }
 #elif defined(STM32L4xx) || defined(STM32F3xx)
-  LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_ALTERNATE);
-  LL_GPIO_SetPinSpeed(gpio_ptr, pin_rx, LL_GPIO_SPEED_FREQ_HIGH);
-  if (pin_rx <= LL_GPIO_PIN_7) {
-    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_rx, LL_GPIO_AF_7);
-  } else {
-    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_rx, LL_GPIO_AF_7);
-  }
-#else
-  LL_GPIO_SetPinMode(gpio_ptr, pin_rx, LL_GPIO_MODE_INPUT);
+  fn = 7;
 #endif
-  //LL_GPIO_SetPinSpeed(gpio_ptr, pin_rx, LL_GPIO_SPEED_FREQ_HIGH);
-  LL_GPIO_SetPinPull(gpio_ptr, pin_rx, LL_GPIO_PULL_UP);
-}
-
-void usart_tx_pin_config(GPIO_TypeDef *gpio_ptr, uint32_t pin_tx)
-{
-  /* TX pin */
-  LL_GPIO_SetPinMode(gpio_ptr, pin_tx, LL_GPIO_MODE_ALTERNATE);
-  LL_GPIO_SetPinSpeed(gpio_ptr, pin_tx, LL_GPIO_SPEED_FREQ_HIGH);
-  LL_GPIO_SetPinPull(gpio_ptr, pin_tx, LL_GPIO_PULL_UP);
-#if defined(STM32L0xx)
-  if (gpio_ptr == GPIOB && pin_tx == LL_GPIO_PIN_6) {
-    // USART1 is AF0
-    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_tx, LL_GPIO_AF_0);
-  } else if (pin_tx <= LL_GPIO_PIN_7) {
-    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_tx, LL_GPIO_AF_4);
-  } else {
-    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_tx, LL_GPIO_AF_4);
-  }
-#elif defined(STM32L4xx) || defined(STM32F3xx)
-  if (pin_tx <= LL_GPIO_PIN_7) {
-    LL_GPIO_SetAFPin_0_7(gpio_ptr, pin_tx, LL_GPIO_AF_7);
-  } else {
-    LL_GPIO_SetAFPin_8_15(gpio_ptr, pin_tx, LL_GPIO_AF_7);
-  }
-#endif
+  pin = 0x1 << pin;
+  GPIO_SetupPin(gpio_ptr, pin, GPIO_FUNCTION(fn), 1);
 }
 
 // **************************************************
@@ -361,12 +323,10 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   uart_reset(USART2);
 
   /* UART RX pin config */
-  gpio_port_clock((uint32_t)GPIOB);
-  usart_rx_pin_config(GPIOB, LL_GPIO_PIN_6);
+  usart_pin_config(GPIOB, 6);
 
   /* UART TX pin config */
-  gpio_port_clock((uint32_t)GPIOA);
-  usart_tx_pin_config(GPIOA, LL_GPIO_PIN_2);
+  usart_pin_config(GPIOA, 2);
 
   usart_hw_init(USART2, baud, USART_CR1_TE, 1); // TX, half duplex
   UART_TX_HANDLE = USART2;
@@ -386,12 +346,10 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   uart_reset(USART1);
 
   /* UART RX pin config */
-  gpio_port_clock((uint32_t)GPIOB);
-  usart_rx_pin_config(GPIOB, LL_GPIO_PIN_11);
+  usart_pin_config(GPIOB, 11);
 
   /* UART TX pin config */
-  gpio_port_clock((uint32_t)GPIOA);
-  usart_tx_pin_config(GPIOA, LL_GPIO_PIN_9);
+  usart_pin_config(GPIOA, 9);
 
   usart_hw_init(USART1, baud, USART_CR1_TE, 0); // TX, half duplex
   UART_TX_HANDLE = USART1;
@@ -410,18 +368,18 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
       switch (afio) {
         case 1:
           gpio_ptr = GPIOB;
-          pin_rx = LL_GPIO_PIN_7;
-          pin_tx = LL_GPIO_PIN_6;
+          pin_rx = 7;
+          pin_tx = 6;
           break;
         case 2:
           gpio_ptr = GPIOC;
-          pin_rx = LL_GPIO_PIN_5;
-          pin_tx = LL_GPIO_PIN_4;
+          pin_rx = 5;
+          pin_tx = 4;
           break;
         default:
           gpio_ptr = GPIOA;
-          pin_rx = LL_GPIO_PIN_10;
-          pin_tx = LL_GPIO_PIN_9;
+          pin_rx = 10;
+          pin_tx = 9;
           break;
       }
       break;
@@ -433,19 +391,19 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
         case 1:
           /* JTAG pins. Need remapping! */
           gpio_ptr = GPIOA;
-          pin_rx = LL_GPIO_PIN_15;
-          pin_tx = LL_GPIO_PIN_14;
+          pin_rx = 15;
+          pin_tx = 14;
           break;
         case 2:
           /* JTAG pins. Need remapping! */
           gpio_ptr = GPIOB;
-          pin_rx = LL_GPIO_PIN_4;
-          pin_tx = LL_GPIO_PIN_3;
+          pin_rx = 4;
+          pin_tx = 3;
           break;
         default:
           gpio_ptr = GPIOA;
-          pin_rx = LL_GPIO_PIN_3;
-          pin_tx = LL_GPIO_PIN_2;
+          pin_rx = 3;
+          pin_tx = 2;
           break;
       }
       break;
@@ -457,18 +415,18 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
       switch (afio) {
         case 1:
           gpio_ptr = GPIOB;
-          pin_rx = LL_GPIO_PIN_8;
-          pin_tx = LL_GPIO_PIN_9;
+          pin_rx = 8;
+          pin_tx = 9;
           break;
         case 2:
           gpio_ptr = GPIOC;
-          pin_rx = LL_GPIO_PIN_11;
-          pin_tx = LL_GPIO_PIN_10;
+          pin_rx = 11;
+          pin_tx = 10;
           break;
         default:
           gpio_ptr = GPIOB;
-          pin_rx = LL_GPIO_PIN_11;
-          pin_tx = LL_GPIO_PIN_10;
+          pin_rx = 11;
+          pin_tx = 10;
           break;
       }
       break;
@@ -481,15 +439,14 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   }
 
   uart_reset(uart_ptr);
-  gpio_port_clock((uint32_t)gpio_ptr);
 
   if (!halfduplex) {
     dir = USART_CR1_RE | USART_CR1_TE;
     /* RX pin */
-    usart_rx_pin_config(gpio_ptr, pin_rx);
+    usart_pin_config(gpio_ptr, pin_rx);
   }
   /* TX pin */
-  usart_tx_pin_config(gpio_ptr, pin_tx);
+  usart_pin_config(gpio_ptr, pin_tx);
   /* Duplex pin */
   duplex_setup_pin(duplexpin);
   /* Usart peripheral config */

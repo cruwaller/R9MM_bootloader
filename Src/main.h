@@ -91,6 +91,20 @@ enum {
 #define IO_GET_PORT(_p) (((_p) / 16) - 'A')
 #define IO_GET_PIN(_p)  ((_p) % 16)
 
+#define GPIO_INPUT        0
+#define GPIO_OUTPUT       1
+#define GPIO_AF           2
+#define GPIO_ANALOG       3
+#define GPIO_OPEN_DRAIN   0x100
+#define GPIO_FUNCTION(fn) (GPIO_AF | ((fn) << 4))
+
+void GPIO_SetupPin(GPIO_TypeDef *regs, uint32_t pos, uint32_t mode, int pullup);
+void GPIO_WritePin(GPIO_TypeDef *regs, uint32_t pos, uint32_t state);
+uint8_t GPIO_ReadPin(GPIO_TypeDef *regs, uint32_t pos);
+#define GPIO_WritePinSet(reg, pos) ((GPIO_TypeDef *)(reg)->BSRR = (0x1 << pos))
+#define GPIO_WritePinReset(reg, pos) ((GPIO_TypeDef *)(reg)->BSRR = (0x1 << (pos + 16)))
+
+
 enum led_states
 {
   LED_OFF,
@@ -106,11 +120,7 @@ void led_state_set(uint32_t state);
 int8_t boot_wait_timer_end(void);
 
 void gpio_port_pin_get(uint32_t io, void ** port, uint32_t * pin);
-void gpio_port_clock(uint32_t port);
 
-#define GPIO_WritePin(port, pin, _state) \
-  (_state) ? LL_GPIO_SetOutputPin(port, pin) : \
-  LL_GPIO_ResetOutputPin(port, pin)
 
 /* Private defines -----------------------------------------------------------*/
 #if !defined(XMODEM) && !STK500 && !FRSKY

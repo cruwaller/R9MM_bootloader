@@ -74,12 +74,7 @@ static void ws2812_send_color(uint8_t const *const RGB) // takes RGB data
 void ws2812_init(void)
 {
     gpio_port_pin_get(IO_CREATE(WS2812_LED_PIN), &ws2812_port, &ws2812_pin);
-    gpio_port_clock((uint32_t)ws2812_port);
-    LL_GPIO_SetPinMode(ws2812_port, ws2812_pin, LL_GPIO_MODE_OUTPUT);
-    LL_GPIO_SetPinOutputType(ws2812_port, ws2812_pin, LL_GPIO_OUTPUT_PUSHPULL);
-    LL_GPIO_SetPinSpeed(ws2812_port, ws2812_pin, LL_GPIO_SPEED_FREQ_HIGH);
-    //LL_GPIO_SetPinPull(ws2812_port, ws2812_pin, LL_GPIO_PULL_NO);
-    LL_GPIO_ResetOutputPin(ws2812_port, ws2812_pin);
+    GPIO_SetupPin(ws2812_port, ws2812_pin, GPIO_OUTPUT, -1);
 }
 
 void ws2812_set_color(uint8_t const r, uint8_t const g, uint8_t const b)
