@@ -152,31 +152,24 @@ void GPIO_SetupPin(GPIO_TypeDef *regs, uint32_t pos, uint32_t mode, int pullup)
   else if (pullup < 0)
     regs->BSRR = 1 << (pos + 16);
 #else
-  uint32_t bit_pos = 0x1 << pos;
+  uint32_t const bit_pos = 0x1 << pos;
   if (mode == GPIO_INPUT) {
     LL_GPIO_SetPinMode(regs, bit_pos, LL_GPIO_MODE_INPUT);
     LL_GPIO_SetPinPull(regs, bit_pos, (0 < pullup ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN));
   } else if (mode == GPIO_OUTPUT) {
     LL_GPIO_SetPinMode(regs, bit_pos, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinOutputType(regs, bit_pos, LL_GPIO_OUTPUT_PUSHPULL);
-    //LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_LOW);
-    LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_MEDIUM);
+    LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_LOW);
     LL_GPIO_ResetOutputPin(regs, bit_pos);
   } else {
-    mode >>= 4;
+    mode = (mode >> 4) & 0xff;
     LL_GPIO_SetPinMode(regs, bit_pos, LL_GPIO_MODE_ALTERNATE);
-//#if defined(STM32L0xx)
-//#elif defined(STM32L4xx) || defined(STM32F3xx)
-    LL_GPIO_SetPinSpeed(regs, bit_pos, LL_GPIO_SPEED_FREQ_HIGH);
-//#else
-//#error "Not implemented!"
-//#endif
-    if (pos & 8) {
-      LL_GPIO_SetAFPin_0_7(regs, bit_pos, mode);
-    } else {
-      LL_GPIO_SetAFPin_8_15(regs, bit_pos, mode);
-    }
     LL_GPIO_SetPinPull(regs, bit_pos, (0 < pullup ? LL_GPIO_PULL_UP : LL_GPIO_PULL_DOWN));
+    if (pos & 0x8) {
+      LL_GPIO_SetAFPin_8_15(regs, bit_pos, mode);
+    } else {
+      LL_GPIO_SetAFPin_0_7(regs, bit_pos, mode);
+    }
   }
 #endif
 }

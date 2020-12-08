@@ -75,22 +75,18 @@ void duplex_state_set(const uint8_t state)
   }
 }
 
-void usart_pin_config(GPIO_TypeDef *gpio_ptr, uint32_t pin)
+void usart_pin_config(GPIO_TypeDef *gpio_ptr, uint32_t pin, uint8_t isrx)
 {
-  uint32_t fn = 0;
 #if defined(STM32L0xx)
-  if (gpio_ptr == GPIOB &&
-      (pin == 6 || pin == 7)) {
+  uint32_t fn = GPIO_FUNCTION(4);
+  if (gpio_ptr == GPIOB && (pin == 6 || pin == 7)) {
     // USART1 is AF0
-    fn = 0;
-  } else {
-    fn = 4;
+    fn = GPIO_FUNCTION(0);
   }
-#elif defined(STM32L4xx) || defined(STM32F3xx)
-  fn = 7;
+#else
+  uint32_t fn = GPIO_FUNCTION(7);
 #endif
-  pin = 0x1 << pin;
-  GPIO_SetupPin(gpio_ptr, pin, GPIO_FUNCTION(fn), 1);
+  GPIO_SetupPin(gpio_ptr, pin, fn, isrx);
 }
 
 // **************************************************
@@ -323,10 +319,10 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   uart_reset(USART2);
 
   /* UART RX pin config */
-  usart_pin_config(GPIOB, 6);
+  usart_pin_config(GPIOB, 6, 1);
 
   /* UART TX pin config */
-  usart_pin_config(GPIOA, 2);
+  usart_pin_config(GPIOA, 2, 0);
 
   usart_hw_init(USART2, baud, USART_CR1_TE, 1); // TX, half duplex
   UART_TX_HANDLE = USART2;
@@ -346,10 +342,10 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   uart_reset(USART1);
 
   /* UART RX pin config */
-  usart_pin_config(GPIOB, 11);
+  usart_pin_config(GPIOB, 11, 1);
 
   /* UART TX pin config */
-  usart_pin_config(GPIOA, 9);
+  usart_pin_config(GPIOA, 9, 0);
 
   usart_hw_init(USART1, baud, USART_CR1_TE, 0); // TX, half duplex
   UART_TX_HANDLE = USART1;
@@ -443,10 +439,10 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
   if (!halfduplex) {
     dir = USART_CR1_RE | USART_CR1_TE;
     /* RX pin */
-    usart_pin_config(gpio_ptr, pin_rx);
+    usart_pin_config(gpio_ptr, pin_rx, 1);
   }
   /* TX pin */
-  usart_pin_config(gpio_ptr, pin_tx);
+  usart_pin_config(gpio_ptr, pin_tx, 0);
   /* Duplex pin */
   duplex_setup_pin(duplexpin);
   /* Usart peripheral config */
