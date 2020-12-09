@@ -216,10 +216,12 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   uart_status status = UART_OK;
   duplex_state_set(DUPLEX_TX);
   while (len--) {
-    LL_USART_TransmitData8(UART_handle_tx, *data++);
     while (!LL_USART_IsActiveFlag_TXE(UART_handle_tx))
       ;
+    LL_USART_TransmitData8(UART_handle_tx, *data++);
   }
+  while (!LL_USART_IsActiveFlag_TXE(UART_handle_tx))
+    ;
   while (!LL_USART_IsActiveFlag_TC(UART_handle_tx))
     ;
   duplex_state_set(DUPLEX_RX);
