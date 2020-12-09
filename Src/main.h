@@ -55,17 +55,15 @@
 #define BUILD_VERSION(ver) STRINGIFY(ver)
 #define BUILD_MCU_TYPE(type) STRINGIFY(BL_TYPE: type)
 
-#if UART_NUM < 1 || 3 < UART_NUM || (UART_NUM == 3 && !defined(USART3))
-#error "Invalid UART config"
+#ifndef UART_TX_PIN
+#error "Invalid UART config! TX pin is mandatory"
 #endif
-#ifndef UART_AFIO
-#define UART_AFIO 0 // default
-#endif
-#ifndef HALF_DUPLEX
-#define HALF_DUPLEX 0
-#endif
+
 #ifndef UART_BAUD
 #define UART_BAUD 420000
+#endif
+#ifndef UART_BAUD_2ND
+#define UART_BAUD_2ND UART_BAUD
 #endif
 
 
@@ -90,6 +88,7 @@ enum {
 #define IO_CREATE(...)  IO_CREATE_IMPL(__VA_ARGS__)
 #define IO_GET_PORT(_p) (((_p) / 16) - 'A')
 #define IO_GET_PIN(_p)  ((_p) % 16)
+#define GPIO(R, P)      (((R) * 16) + (P))
 
 #define GPIO_INPUT        0
 #define GPIO_OUTPUT       1
@@ -98,11 +97,22 @@ enum {
 #define GPIO_OPEN_DRAIN   0x100
 #define GPIO_FUNCTION(fn) (GPIO_AF | ((fn) << 4))
 
+struct gpio_pin {
+  GPIO_TypeDef *reg;
+  uint32_t bit;
+};
+struct gpio_pin GPIO_Setup(uint32_t pin, uint32_t mode, int pullup);
+static inline void GPIO_Write(struct gpio_pin gpio, uint32_t state) {
+  if (state)
+    gpio.reg->BSRR = gpio.bit;
+  else
+    gpio.reg->BSRR = (gpio.bit << 16);
+}
+static inline uint8_t GPIO_Read(struct gpio_pin gpio) {
+  return !!(gpio.reg->IDR & gpio.bit);
+}
+
 void GPIO_SetupPin(GPIO_TypeDef *regs, uint32_t pos, uint32_t mode, int pullup);
-void GPIO_WritePin(GPIO_TypeDef *regs, uint32_t pos, uint32_t state);
-uint8_t GPIO_ReadPin(GPIO_TypeDef *regs, uint32_t pos);
-#define GPIO_WritePinSet(reg, pos) ((GPIO_TypeDef *)(reg)->BSRR = (0x1 << pos))
-#define GPIO_WritePinReset(reg, pos) ((GPIO_TypeDef *)(reg)->BSRR = (0x1 << (pos + 16)))
 
 
 enum led_states

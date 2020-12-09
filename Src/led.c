@@ -2,9 +2,11 @@
 #include "main.h"
 
 #if defined(WS2812_LED_PIN)
-static void *ws2812_port;
-static uint32_t ws2812_pin;
+struct gpio_pin led_pin;
 
+#ifndef BRIGHTNESS
+#define BRIGHTNESS 30 // 1...256
+#endif
 
 #define WS2812_DELAY_LONG() \
     __NOP(); __NOP(); __NOP(); __NOP(); __NOP(); \
@@ -25,26 +27,27 @@ static uint32_t ws2812_pin;
 
 
 static inline void
-ws2812_send_1(void * const port, uint32_t const pin)
+ws2812_send_1(struct gpio_pin pin)
 {
-    GPIO_WritePin(port, pin, 1);
+    GPIO_Write(pin, 1);
     WS2812_DELAY_LONG();
-    GPIO_WritePin(port, pin, 0);
+    GPIO_Write(pin, 0);
     WS2812_DELAY_SHORT();
 }
 
 static inline void
-ws2812_send_0(void * const port, uint32_t const pin)
+ws2812_send_0(struct gpio_pin pin)
 {
-    GPIO_WritePin(port, pin, 1);
+    GPIO_Write(pin, 1);
     WS2812_DELAY_SHORT();
-    GPIO_WritePin(port, pin, 0);
+    GPIO_Write(pin, 0);
     WS2812_DELAY_LONG();
 }
 
-static uint32_t bitReverse(uint8_t input)
+static uint32_t bitReverse(uint32_t input)
 {
-    uint8_t r = input; // r will be reversed bits of v; first get LSB of v
+    // r will be reversed bits of v; first get LSB of v
+    uint8_t r = (uint8_t)((input * BRIGHTNESS) >> 8);
     uint8_t s = 8 - 1; // extra shift needed at end
 
     for (input >>= 1; input; input >>= 1) {
@@ -58,23 +61,21 @@ static uint32_t bitReverse(uint8_t input)
 
 static void ws2812_send_color(uint8_t const *const RGB) // takes RGB data
 {
-    void * const port = ws2812_port;
-    uint32_t const pin = ws2812_pin;
+    struct gpio_pin pin = led_pin;
     uint32_t LedColourData =
         bitReverse(RGB[1]) +        // Green
         (bitReverse(RGB[0]) << 8) + // Red
         (bitReverse(RGB[2]) << 16); // Blue
     uint8_t bits = 24;
     while (bits--) {
-        (LedColourData & 0x1) ? ws2812_send_1(port, pin) : ws2812_send_0(port, pin);
+        (LedColourData & 0x1) ? ws2812_send_1(pin) : ws2812_send_0(pin);
         LedColourData >>= 1;
     }
 }
 
 void ws2812_init(void)
 {
-    gpio_port_pin_get(IO_CREATE(WS2812_LED_PIN), &ws2812_port, &ws2812_pin);
-    GPIO_SetupPin(ws2812_port, ws2812_pin, GPIO_OUTPUT, -1);
+    led_pin = GPIO_Setup(IO_CREATE(WS2812_LED_PIN), GPIO_OUTPUT, -1);
 }
 
 void ws2812_set_color(uint8_t const r, uint8_t const g, uint8_t const b)

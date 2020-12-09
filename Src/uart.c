@@ -18,13 +18,7 @@
 #define USART_USE_RX_ISR 1
 #endif
 
-USART_TypeDef *UART_handle;
-#if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
-USART_TypeDef *UART_handle_tx;
-#define UART_TX_HANDLE UART_handle_tx
-#else
-#define UART_TX_HANDLE UART_handle
-#endif
+USART_TypeDef *UART_handle_rx, *UART_handle_tx;
 
 #if USART_USE_RX_ISR
 #define USART_CR1_FLAGS (USART_CR1_UE | LL_USART_CR1_RXNEIE)
@@ -39,17 +33,14 @@ enum
 };
 
 static uint8_t uart_half_duplex;
-static void *duplex_port;
-static uint32_t duplex_pin;
+static struct gpio_pin duplex_pin;
 
 void duplex_setup_pin(int32_t pin)
 {
-  duplex_port = NULL;
+  duplex_pin.reg = NULL;
   if (pin < 0)
     return;
-
-  gpio_port_pin_get(pin, &duplex_port, &duplex_pin);
-  GPIO_SetupPin(duplex_port, duplex_pin, GPIO_OUTPUT, -1);
+  duplex_pin = GPIO_Setup(pin, GPIO_OUTPUT, -1);
 }
 
 #ifndef DUPLEX_INVERTED
@@ -58,35 +49,35 @@ void duplex_setup_pin(int32_t pin)
 
 void duplex_state_set(const uint8_t state)
 {
-  if (uart_half_duplex || duplex_port) {
+  if (uart_half_duplex || duplex_pin.reg) {
     switch (state) {
       case DUPLEX_TX:
-        UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_TE;
+        UART_handle_tx->CR1 = USART_CR1_FLAGS | USART_CR1_TE;
         break;
       case DUPLEX_RX:
-        UART_TX_HANDLE->CR1 = USART_CR1_FLAGS | USART_CR1_RE;
+        UART_handle_tx->CR1 = USART_CR1_FLAGS | USART_CR1_RE;
         break;
       default:
         break;
     }
   }
-  if (duplex_port) {
-    GPIO_WritePin(duplex_port, duplex_pin, ((state == DUPLEX_TX) ^ DUPLEX_INVERTED));
+  if (duplex_pin.reg) {
+    GPIO_Write(duplex_pin, ((state == DUPLEX_TX) ^ DUPLEX_INVERTED));
   }
 }
 
-void usart_pin_config(GPIO_TypeDef *gpio_ptr, uint32_t pin, uint8_t isrx)
+void usart_pin_config(uint32_t pin, uint8_t isrx)
 {
 #if defined(STM32L0xx)
   uint32_t fn = GPIO_FUNCTION(4);
-  if (gpio_ptr == GPIOB && (pin == 6 || pin == 7)) {
+  if (pin == GPIO('B', 6) || pin == GPIO('B', 7)) {
     // USART1 is AF0
     fn = GPIO_FUNCTION(0);
   }
 #else
   uint32_t fn = GPIO_FUNCTION(7);
 #endif
-  GPIO_SetupPin(gpio_ptr, pin, fn, isrx);
+  GPIO_Setup(pin, fn, isrx);
 }
 
 // **************************************************
@@ -161,13 +152,13 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
 {
   uint32_t tickstart;
 #if !USART_USE_RX_ISR
-  LL_USART_ClearFlag_ORE(UART_handle);
-  LL_USART_ClearFlag_NE(UART_handle);
-  LL_USART_ClearFlag_FE(UART_handle);
+  LL_USART_ClearFlag_ORE(UART_handle_rx);
+  LL_USART_ClearFlag_NE(UART_handle_rx);
+  LL_USART_ClearFlag_FE(UART_handle_rx);
 
   while (length--) {
     tickstart = HAL_GetTick();
-    while (!LL_USART_IsActiveFlag_RXNE(UART_handle)) {
+    while (!LL_USART_IsActiveFlag_RXNE(UART_handle_rx)) {
       /* Check for the Timeout */
       if (timeout != HAL_MAX_DELAY) {
         if ((timeout == 0U) || ((HAL_GetTick() - tickstart) > timeout)) {
@@ -175,7 +166,7 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
         }
       }
     }
-    *data++ = (uint8_t)LL_USART_ReceiveData8(UART_handle);
+    *data++ = (uint8_t)LL_USART_ReceiveData8(UART_handle_rx);
   }
 #else
   while (length--) {
@@ -225,11 +216,11 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   uart_status status = UART_OK;
   duplex_state_set(DUPLEX_TX);
   while (len--) {
-    LL_USART_TransmitData8(UART_TX_HANDLE, *data++);
-    while (!LL_USART_IsActiveFlag_TXE(UART_TX_HANDLE))
+    LL_USART_TransmitData8(UART_handle_tx, *data++);
+    while (!LL_USART_IsActiveFlag_TXE(UART_handle_tx))
       ;
   }
-  while (!LL_USART_IsActiveFlag_TC(UART_TX_HANDLE))
+  while (!LL_USART_IsActiveFlag_TC(UART_handle_tx))
     ;
   duplex_state_set(DUPLEX_RX);
   return status;
@@ -250,27 +241,6 @@ static IRQn_Type usart_get_irq(USART_TypeDef *USARTx)
   return 0;
 }
 #endif
-
-static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, uint8_t halfduplex) {
-  uint32_t pclk = SystemCoreClock / 2;
-#if defined(STM32F1)
-  LL_USART_SetBaudRate(USARTx, pclk, baud);
-#else
-  LL_USART_SetBaudRate(USARTx, pclk, LL_USART_OVERSAMPLING_16, baud);
-#endif
-  LL_USART_ConfigAsyncMode(USARTx);
-  if (halfduplex)
-    LL_USART_EnableHalfDuplex(USARTx);
-  USARTx->CR1 = USART_CR1_FLAGS | dir;
-  uart_half_duplex = halfduplex;
-
-#if USART_USE_RX_ISR
-  IRQn_Type irq = usart_get_irq(USARTx);
-  NVIC_SetPriority(irq,
-      NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
-  NVIC_EnableIRQ(irq);
-#endif // USART_USE_RX_ISR
-}
 
 static void uart_reset(USART_TypeDef * uart_ptr)
 {
@@ -300,106 +270,132 @@ static void uart_reset(USART_TypeDef * uart_ptr)
   }
 }
 
+static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t dir, uint8_t halfduplex) {
+  uint32_t pclk = SystemCoreClock / 2;
+
+  /* Reset UART peripheral */
+  uart_reset(USARTx);
+
+#if defined(STM32F1)
+  LL_USART_SetBaudRate(USARTx, pclk, baud);
+#else
+  LL_USART_SetBaudRate(USARTx, pclk, LL_USART_OVERSAMPLING_16, baud);
+#endif
+  LL_USART_ConfigAsyncMode(USARTx);
+  if (halfduplex)
+    LL_USART_EnableHalfDuplex(USARTx);
+  USARTx->CR1 = USART_CR1_FLAGS | dir;
+
+  if (dir & USART_CR1_TE)
+    uart_half_duplex = halfduplex;
+
+  /* Store handles */
+  if (dir == USART_CR1_TE)
+    UART_handle_tx = USARTx;
+  else if (dir == USART_CR1_RE)
+    UART_handle_rx = USARTx;
+  else
+    UART_handle_rx = UART_handle_tx = USARTx;
+
+#if USART_USE_RX_ISR
+  IRQn_Type irq = usart_get_irq(USARTx);
+  NVIC_SetPriority(irq,
+      NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
+  NVIC_EnableIRQ(irq);
+#endif // USART_USE_RX_ISR
+}
+
+static uint8_t uart_valid_pin_tx(uint32_t pin)
+{
+  switch (pin) {
+    case GPIO('A', 2):
+    case GPIO('A', 9):
+    case GPIO('A', 14):
+    case GPIO('B', 3):
+    case GPIO('B', 6):
+    case GPIO('B', 9):
+    case GPIO('B', 10):
+    case GPIO('C', 4):
+    case GPIO('C', 10):
+      return 1;
+  }
+  return 0;
+}
+
+static USART_TypeDef * uart_peripheral_get(uint32_t pin)
+{
+  switch (pin) {
+    case GPIO('A', 9):
+    case GPIO('A', 10):
+    case GPIO('B', 6):
+    case GPIO('B', 7):
+    case GPIO('C', 4):
+    case GPIO('C', 5):
+      return USART1;
+    case GPIO('A', 2):
+    case GPIO('A', 3):
+    case GPIO('A', 14):
+    case GPIO('A', 15):
+    case GPIO('B', 3):
+    case GPIO('B', 4):
+      return USART2;
+#ifdef USART3
+    case GPIO('B', 8):
+    case GPIO('B', 9):
+    case GPIO('B', 10):
+    case GPIO('B', 11):
+    case GPIO('C', 10):
+    case GPIO('C', 11):
+      return USART3;
+#endif // USART3
+  }
+  return NULL;
+}
+
+
 /**
  * @brief UART Initialization Function
  * @param None
  * @retval None
  */
-void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpin, uint8_t halfduplex)
+void uart_init(uint32_t baud, uint32_t pin_rx, uint32_t pin_tx, int32_t duplexpin)
 {
-#if TARGET_GHOST_RX_V1_2
-  (void)duplexpin;
-  (void)halfduplex;
-  // RX = PB6 [USART1]
-  // TX = PA2 [USART2]
-
-  /* Reset RX UART */
-  uart_reset(USART1);
-  /* Reset TX UART */
-  uart_reset(USART2);
-
-  /* UART RX pin config */
-  usart_pin_config(GPIOB, 6, 1);
-
-  /* UART TX pin config */
-  usart_pin_config(GPIOA, 2, 0);
-
-  usart_hw_init(USART2, baud, USART_CR1_TE, 1); // TX, half duplex
-  UART_TX_HANDLE = USART2;
-  usart_hw_init(USART1, baud, USART_CR1_RE, 1); // RX, half duplex
-  UART_handle = USART1;
-
-#elif TARGET_R9SLIM_PLUS // !TARGET_GHOST_RX_V1_2
-  (void)duplexpin;
-  (void)halfduplex;
-
-  // RX = PB11 [USART3]
-  // TX = PA9 [USART1]
-
-  /* Reset RX UART */
-  uart_reset(USART3);
-  /* Reset TX UART */
-  uart_reset(USART1);
-
-  /* UART RX pin config */
-  usart_pin_config(GPIOB, 11, 1);
-
-  /* UART TX pin config */
-  usart_pin_config(GPIOA, 9, 0);
-
-  usart_hw_init(USART1, baud, USART_CR1_TE, 0); // TX, half duplex
-  UART_TX_HANDLE = USART1;
-  usart_hw_init(USART3, baud, USART_CR1_RE, 0); // RX, half duplex
-  UART_handle = USART3;
-
-#else //!TARGET_GHOST_RX_V1_2 && !TARGET_R9SLIM_PLUS
-
-  USART_TypeDef * uart_ptr;
-  GPIO_TypeDef *gpio_ptr;
-  uint32_t pin_rx, pin_tx, dir = USART_CR1_TE;
-
+  uint8_t halfduplex;
+#if 0
   switch (uart_idx) {
     case 1: {
-      uart_ptr = USART1;
       switch (afio) {
         case 1:
-          gpio_ptr = GPIOB;
-          pin_rx = 7;
-          pin_tx = 6;
+          pin_rx = GPIO('B', 7);
+          pin_tx = GPIO('B', 6);
           break;
         case 2:
-          gpio_ptr = GPIOC;
-          pin_rx = 5;
-          pin_tx = 4;
+          pin_rx = GPIO('C', 5);
+          pin_tx = GPIO('C', 4);
           break;
         default:
-          gpio_ptr = GPIOA;
-          pin_rx = 10;
-          pin_tx = 9;
+          pin_rx = GPIO('A', 10);
+          pin_tx = GPIO('A', 9);
           break;
       }
       break;
     }
 
     case 2: {
-      uart_ptr = USART2;
       switch (afio) {
         case 1:
           /* JTAG pins. Need remapping! */
-          gpio_ptr = GPIOA;
-          pin_rx = 15;
-          pin_tx = 14;
+          pin_rx = GPIO('A', 15);
+          pin_tx = GPIO('A', 14);
           break;
         case 2:
           /* JTAG pins. Need remapping! */
-          gpio_ptr = GPIOB;
-          pin_rx = 4;
-          pin_tx = 3;
+          pin_rx = GPIO('B', 4);
+          pin_tx = GPIO('B', 3);
           break;
         default:
-          gpio_ptr = GPIOA;
-          pin_rx = 3;
-          pin_tx = 2;
+          pin_rx = GPIO('A', 3);
+          pin_tx = GPIO('A', 2);
           break;
       }
       break;
@@ -407,22 +403,18 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
 
 #if defined(USART3)
     case 3: {
-      uart_ptr = USART3;
       switch (afio) {
         case 1:
-          gpio_ptr = GPIOB;
-          pin_rx = 8;
-          pin_tx = 9;
+          pin_rx = GPIO('B', 8);
+          pin_tx = GPIO('B', 9);
           break;
         case 2:
-          gpio_ptr = GPIOC;
-          pin_rx = 11;
-          pin_tx = 10;
+          pin_rx = GPIO('C', 11);
+          pin_tx = GPIO('C', 10);
           break;
         default:
-          gpio_ptr = GPIOB;
-          pin_rx = 11;
-          pin_tx = 10;
+          pin_rx = GPIO('B', 11);
+          pin_tx = GPIO('B', 10);
           break;
       }
       break;
@@ -434,31 +426,47 @@ void uart_init(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpi
       return;
   }
 
-  uart_reset(uart_ptr);
+  /* Skip RX pin if half duplex */
+  if (halfduplex)
+    pin_rx = 0;
+#endif
 
-  if (!halfduplex) {
-    dir = USART_CR1_RE | USART_CR1_TE;
-    /* RX pin */
-    usart_pin_config(gpio_ptr, pin_rx, 1);
+  USART_TypeDef * uart_ptr = uart_peripheral_get(pin_tx);
+  uint32_t dir = USART_CR1_RE | USART_CR1_TE;
+  halfduplex = 0;
+
+  if (!uart_ptr) {
+    Error_Handler();
   }
+
+  if (pin_rx) {
+    USART_TypeDef * uart_ptr_rx = uart_peripheral_get(pin_rx);
+    if (uart_ptr_rx && uart_ptr_rx != uart_ptr) {
+      /* RX USART peripheral config */
+      usart_hw_init(uart_ptr_rx, baud, USART_CR1_RE, uart_valid_pin_tx(pin_rx));
+      dir = USART_CR1_TE;
+      halfduplex = 1;
+    }
+    /* RX pin */
+    usart_pin_config(pin_rx, 1);
+  } else {
+    halfduplex = 1; // No RX pin == half duplex
+  }
+  /* TX USART peripheral config */
+  usart_hw_init(uart_ptr, baud, dir, halfduplex);
   /* TX pin */
-  usart_pin_config(gpio_ptr, pin_tx, 0);
+  usart_pin_config(pin_tx, 0);
+
   /* Duplex pin */
   duplex_setup_pin(duplexpin);
-  /* Usart peripheral config */
-  UART_handle = uart_ptr;
-  usart_hw_init(uart_ptr, baud, dir, halfduplex);
   /* Enable RX by default */
   duplex_state_set(DUPLEX_RX);
-#endif // TARGET_GHOST_RX_V1_2
 }
 
 void uart_deinit(void)
 {
-  if (UART_handle)
-    uart_reset(UART_handle);
-#if TARGET_GHOST_RX_V1_2 || TARGET_R9SLIM_PLUS
-  if (UART_TX_HANDLE && UART_handle != UART_TX_HANDLE)
-    uart_reset(UART_TX_HANDLE);
-#endif
+  if (UART_handle_rx)
+    uart_reset(UART_handle_rx);
+  if (UART_handle_rx != UART_handle_tx)
+    uart_reset(UART_handle_tx);
 }

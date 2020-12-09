@@ -40,14 +40,15 @@
 /* Private variables ---------------------------------------------------------*/
 
 #if defined(PIN_BUTTON)
-void *btn_port;
-uint32_t btn_pin;
+struct gpio_pin gpio_btn;
 #endif
 #if defined(PIN_LED_RED)
+struct gpio_pin gpio_led_red;
 void *led_red_port;
 uint32_t led_red_pin;
 #endif
 #if defined(PIN_LED_GREEN)
+struct gpio_pin gpio_led_green;
 void *led_green_port;
 uint32_t led_green_pin;
 #endif
@@ -60,7 +61,7 @@ static int32_t duplex_pin = -1;
 #ifndef BUTTON_INVERTED
 #define BUTTON_INVERTED   1
 #endif // BUTTON_INVERTED
-#define BTN_READ() (GPIO_ReadPin(btn_port, btn_pin) ^ BUTTON_INVERTED)
+#define BTN_READ() (GPIO_Read(gpio_btn) ^ BUTTON_INVERTED)
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -174,17 +175,16 @@ void GPIO_SetupPin(GPIO_TypeDef *regs, uint32_t pos, uint32_t mode, int pullup)
 #endif
 }
 
-void GPIO_WritePin(GPIO_TypeDef *regs, uint32_t pos, uint32_t state)
+struct gpio_pin
+GPIO_Setup(uint32_t io, uint32_t mode, int pullup)
 {
-  if (state)
-    regs->BSRR = 1 << pos;
-  else
-    regs->BSRR = 1 << (pos + 16);
-}
+  uint32_t pin = IO_GET_PIN(io);
+  io = IO_GET_PORT(io);
+  GPIO_TypeDef *port = (void*)((uintptr_t)GPIOA_BASE + (io * 0x0400UL));
 
-uint8_t GPIO_ReadPin(GPIO_TypeDef *regs, uint32_t pos)
-{
-  return !!(regs->IDR & (0x1 << pos));
+  GPIO_SetupPin(port, pin, mode, pullup);
+
+  return (struct gpio_pin){.reg = port, .bit = (1 << pin)};
 }
 
 void led_state_set(uint32_t state)
@@ -209,12 +209,11 @@ void led_state_set(uint32_t state)
   };
 
 #if defined(PIN_LED_RED)
-  GPIO_WritePin(led_red_port, led_red_pin, (!!(uint8_t)val));
+  GPIO_Write(gpio_led_red, (!!(uint8_t)val));
 #endif
 #if defined(PIN_LED_GREEN)
-  GPIO_WritePin(led_green_port, led_green_pin, !!(uint8_t)(val >> 8));
+  GPIO_Write(gpio_led_green, !!(uint8_t)(val >> 8));
 #endif
-  //ws2812_set_color((uint8_t)(val), (uint8_t)(val >> 8), (uint8_t)(val >> 16));
   ws2812_set_color_u32(val);
 }
 
@@ -236,12 +235,12 @@ static void print_boot_header(void)
 #endif
 }
 
-static int8_t boot_code_xmodem(void)
+static int8_t boot_code_xmodem(uint32_t rx_pin, uint32_t tx_pin)
 {
   uint8_t BLrequested = 0;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
-  uart_init(UART_BAUD, UART_NUM, UART_AFIO, duplex_pin, HALF_DUPLEX);
+  uart_init(UART_BAUD, rx_pin, tx_pin, duplex_pin);
 
   print_boot_header();
   /* If the button is pressed, then jump to the user application,
@@ -369,11 +368,11 @@ int8_t boot_wait_timer_end(void)
   return (BOOT_WAIT < (HAL_GetTick() - boot_start_time));
 }
 
-int8_t boot_code_stk(uint32_t baud, uint32_t uart_idx, uint32_t afio, int32_t duplexpin, uint8_t halfduplex)
+int8_t boot_code_stk(uint32_t baud, uint32_t rx_pin, uint32_t tx_pin, int32_t duplexpin)
 {
   int8_t ret = 0;
 
-  uart_init(baud, uart_idx, afio, duplexpin, halfduplex);
+  uart_init(baud, rx_pin, tx_pin, duplexpin);
 
   boot_start_time = HAL_GetTick();
 
@@ -415,29 +414,45 @@ int main(void)
 
   led_state_set(LED_BOOTING);
 
+  uint32_t rx_pin = 0, tx_pin;
   int8_t ret = 0;
 
-#ifndef UART_AFIO_2ND
-#define UART_AFIO_2ND UART_AFIO
-#endif
-#ifndef HALF_DUPLEX_2ND
-#define HALF_DUPLEX_2ND HALF_DUPLEX
-#endif
-#ifndef UART_BAUD_2ND
-#define UART_BAUD_2ND UART_BAUD
-#endif
-
 #if XMODEM
-#if defined(UART_NUM_2ND) && (UART_NUM_2ND != UART_NUM)
-  ret = boot_code_stk(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, duplex_pin, HALF_DUPLEX_2ND);
+#if defined(UART_TX_PIN_2ND)
+#if defined(UART_RX_PIN_2ND)
+  rx_pin = IO_CREATE(UART_RX_PIN_2ND);
+#endif // UART_RX_PIN
+  tx_pin = IO_CREATE(UART_TX_PIN_2ND);
+
+  ret = boot_code_stk(UART_BAUD_2ND, rx_pin, tx_pin, duplex_pin);
   if (ret < 0) // timeout, start xmodem
 #endif
-  ret = boot_code_xmodem();
+  {
+#if defined(UART_RX_PIN)
+    rx_pin = IO_CREATE(UART_RX_PIN);
+#else
+    rx_pin = 0;
+#endif // UART_RX_PIN
+    tx_pin = IO_CREATE(UART_TX_PIN);
+    ret = boot_code_xmodem(rx_pin, tx_pin);
+  }
+
 #else /* !XMODEM */
-  ret = boot_code_stk(UART_BAUD, UART_NUM, UART_AFIO, duplex_pin, HALF_DUPLEX);
-#if defined(UART_NUM_2ND) && (UART_NUM_2ND != UART_NUM)
+#if defined(UART_RX_PIN)
+  rx_pin = IO_CREATE(UART_RX_PIN);
+#endif // UART_RX_PIN
+  tx_pin = IO_CREATE(UART_TX_PIN);
+
+  ret = boot_code_stk(UART_BAUD, rx_pin, tx_pin, duplex_pin);
+#if defined(UART_TX_PIN_2ND)
   if (ret < 0) {
-    ret = boot_code_stk(UART_BAUD_2ND, UART_NUM_2ND, UART_AFIO_2ND, -1, HALF_DUPLEX_2ND);
+#if defined(UART_RX_PIN_2ND)
+    rx_pin = IO_CREATE(UART_RX_PIN_2ND);
+#else
+    rx_pin = 0;
+#endif // UART_RX_PIN
+    tx_pin = IO_CREATE(UART_TX_PIN_2ND);
+    ret = boot_code_stk(UART_BAUD_2ND, rx_pin, tx_pin, -1);
   }
 #endif
 #endif/* XMODEM */
@@ -588,18 +603,15 @@ void SystemClock_Config(void)
 static void MX_GPIO_Init(void)
 {
 #if defined(PIN_BUTTON)
-  gpio_port_pin_get(IO_CREATE(PIN_BUTTON), &btn_port, &btn_pin);
-  GPIO_SetupPin(btn_port, btn_pin, GPIO_INPUT, (BUTTON_INVERTED ? 1 : -1));
+  gpio_btn = GPIO_Setup(IO_CREATE(PIN_BUTTON), GPIO_INPUT, (BUTTON_INVERTED ? 1 : -1));
 #endif // PIN_BUTTON
 
 #if defined(PIN_LED_GREEN)
-  gpio_port_pin_get(IO_CREATE(PIN_LED_GREEN), &led_green_port, &led_green_pin);
-  GPIO_SetupPin(led_green_port, led_green_pin, GPIO_OUTPUT, -1);
+  gpio_led_green = GPIO_Setup(IO_CREATE(PIN_LED_GREEN), GPIO_OUTPUT, -1);
 #endif // PIN_LED_GREEN
 
 #if defined(PIN_LED_RED)
-  gpio_port_pin_get(IO_CREATE(PIN_LED_RED), &led_red_port, &led_red_pin);
-  GPIO_SetupPin(led_red_port, led_red_pin, GPIO_OUTPUT, -1);
+  gpio_led_red = GPIO_Setup(IO_CREATE(PIN_LED_RED), GPIO_OUTPUT, -1);
 #endif // PIN_LED_RED
 
   ws2812_init();
