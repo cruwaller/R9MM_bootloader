@@ -349,7 +349,7 @@ static int8_t boot_code_xmodem(uint32_t rx_pin, uint32_t tx_pin)
     xmodem_receive();
     /* We only exit the xmodem protocol, if there are any errors.
      * In that case, notify the user and start over. */
-    uart_transmit_str("\n\rFailed... Please try again.\n\r");
+    //uart_transmit_str("\n\rFailed... Please try again.\n\r");
   }
 
   return 0;
