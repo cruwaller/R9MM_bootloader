@@ -22,6 +22,7 @@ typedef enum
   UART_ERROR = 0xFFu /**< Generic error. */
 } uart_status;
 
+uart_status uart_clear(void);
 uart_status uart_receive(uint8_t *data, uint16_t length);
 uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeout);
 uart_status uart_transmit_str(char * data);

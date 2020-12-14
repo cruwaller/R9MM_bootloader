@@ -247,7 +247,6 @@ static int8_t boot_code_xmodem(uint32_t rx_pin, uint32_t tx_pin)
    * otherwise stay in the bootloader. */
   uart_transmit_str("Send 'bbbb' or hold down button\n\r");
 
-
 #if 0 // UART ECHO DEBUG
   uint8_t _led_tmp = 0;
   while(1) {
@@ -262,9 +261,10 @@ static int8_t boot_code_xmodem(uint32_t rx_pin, uint32_t tx_pin)
 #endif
 
   /* Wait input from UART */
+  uart_clear();
   if (uart_receive(header, 5u) == UART_OK) {
     /* Search for magic strings */
-    BLrequested = (strstr((char *)header, "bbbb") != NULL) ? 1 : 0;
+    BLrequested = (strnstr((char *)header, "bbbb", sizeof(header)) != NULL) ? 1 : 0;
   }
 
 #if defined(PIN_BUTTON)
@@ -588,7 +588,7 @@ void SystemClock_Config(void)
   __HAL_RCC_AFIO_CLK_ENABLE();
   /** NOJTAG: JTAG-DP Disabled and SW-DP Enabled */
   __HAL_AFIO_REMAP_SWJ_NOJTAG();
-  __HAL_AFIO_REMAP_SWJ_DISABLE();
+  //__HAL_AFIO_REMAP_SWJ_DISABLE();
 #endif
 #endif
 
