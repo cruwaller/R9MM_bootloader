@@ -48,23 +48,17 @@ USART_TypeDef *UART_handle_rx, *UART_handle_tx;
 
 //#define UART_EIE      USART_CR3_EIE
 #define UART_EIE      0x0
-#if USART_USE_RX_ISR
-#define USART_RX_ISR  (UART_EIE | USART_CR1_RXNEIE)
-#else
-#define USART_RX_ISR 0
-#endif
-#if USART_USE_TX_ISR
-#define USART_TX_ISR  (UART_EIE | (USART_CR1_TXEIE * USART_USE_TX_ISR))
-#else
-#define USART_TX_ISR 0
-#endif
+#define USART_RX_ISR  (UART_EIE | (USART_CR1_RXNEIE * USART_USE_RX_ISR))
+#define USART_TX_ISR  (UART_EIE | (USART_CR1_TXEIE  * USART_USE_TX_ISR))
 
-#define UART_FLAGS (USART_CR1_UE)
+#define UART_FLAGS    (USART_CR1_UE)
 #define UART_TX_FLAGS (USART_CR1_TE | USART_TX_ISR)
 #define UART_RX_FLAGS (USART_CR1_RE | USART_RX_ISR)
 
-#define UART_DR_TX (UART_FLAGS | UART_TX_FLAGS)
-#define UART_DR_RX (UART_FLAGS | UART_RX_FLAGS)
+#define UART_DR_TX    (UART_FLAGS | UART_TX_FLAGS)
+#define UART_DR_RX    (UART_FLAGS | UART_RX_FLAGS)
+
+#define RX_ISR_LST    (USART_SR_RXNE | USART_SR_ORE | USART_SR_FE | USART_SR_NE)
 
 static uint32_t UART_CR_RX, UART_CR_TX;
 
@@ -90,17 +84,14 @@ void duplex_setup_pin(int32_t pin)
 
 void duplex_state_set(const uint8_t state)
 {
-  switch (state) {
-    case DUPLEX_TX:
-      UART_handle_tx->CR1 = UART_CR_TX;
-      break;
-    case DUPLEX_RX:
-      //if (duplex_pin.reg || !(UART_CR_RX & USART_CR1_TE))
-      while (!LL_USART_IsActiveFlag_TC(UART_handle_tx));
-      UART_handle_tx->CR1 = UART_CR_RX;
-      break;
-    default:
-      break;
+  USART_TypeDef *handle = UART_handle_tx;
+  if (state == DUPLEX_TX) {
+      handle->CR1 = UART_CR_TX;
+  } else {
+    if (duplex_pin.reg || !(UART_CR_RX & USART_CR1_TE))
+      while (!LL_USART_IsActiveFlag_TC(handle))
+        ;
+    handle->CR1 = UART_CR_RX;
   }
 
   if (duplex_pin.reg) {
@@ -149,22 +140,22 @@ int tx_buffer_push(const uint8_t *buff, uint32_t len)
 {
   uint_fast8_t tmax = read_u8(&tx_head), tpos = read_u8(&tx_tail);
   if (tpos >= tmax) {
-      tpos = tmax = 0;
-      write_u8(&tx_head, 0);
-      write_u8(&tx_tail, 0);
+    tpos = tmax = 0;
+    write_u8(&tx_head, 0);
+    write_u8(&tx_tail, 0);
   }
   if ((tmax + len) > sizeof(tx_buffer)) {
-      if ((tmax + len - tpos) > sizeof(tx_buffer))
-          // Not enough space for message
-          return 0;
-      // Disable TX irq and move buffer
-      write_u8(&tx_head, 0); // this stops TX irqs
+    if ((tmax + len - tpos) > sizeof(tx_buffer))
+      // Not enough space for message
+      return 0;
+    // Disable TX irq and move buffer
+    write_u8(&tx_head, 0); // this stops TX irqs
 
-      tpos = read_u8(&tx_tail);
-      tmax -= tpos;
-      memmove(&tx_buffer[0], &tx_buffer[tpos], tmax);
-      write_u8(&tx_tail, 0);
-      write_u8(&tx_head, tmax);
+    tpos = read_u8(&tx_tail);
+    tmax -= tpos;
+    memmove(&tx_buffer[0], &tx_buffer[tpos], tmax);
+    write_u8(&tx_tail, 0);
+    write_u8(&tx_head, tmax);
   }
 
   memcpy(&tx_buffer[tmax], buff, len);
@@ -180,7 +171,7 @@ void USARTx_IRQ_handler(USART_TypeDef * uart)
 {
   uint32_t SR = uart->StatReg, CR = uart->CR1;
   /* Check for RX data */
-  if (SR & (USART_SR_RXNE | USART_SR_ORE | USART_SR_FE | USART_SR_NE)) {
+  if (SR & RX_ISR_LST) {
     uint8_t data = (uint8_t)LL_USART_ReceiveData8(uart);
     if (CR & USART_CR1_RXNEIE) {
       uint8_t next = rx_head;
@@ -283,7 +274,7 @@ uart_status uart_receive_timeout(uint8_t *data, uint16_t length, uint16_t timeou
             return UART_ERROR;
           }
         }
-      } while(!(SR & (USART_SR_RXNE | USART_SR_ORE | USART_SR_FE | USART_SR_NE)));
+      } while(!(SR & RX_ISR_LST));
       // Read RX register will clear also faults
       rcvd = (uint8_t)LL_USART_ReceiveData8(handle);
       if (SR & USART_SR_RXNE) {
@@ -565,7 +556,7 @@ void uart_init(uint32_t baud, uint32_t pin_rx, uint32_t pin_tx, int32_t duplexpi
   UART_handle_rx = uart_ptr_rx;
 
   /* TX USART peripheral config */
-  usart_hw_init(uart_ptr, baud, UART_CR_RX, halfduplex);
+  usart_hw_init(uart_ptr, baud, 0, halfduplex);
 
   /* Duplex pin */
   duplex_setup_pin(duplexpin);
