@@ -10,6 +10,10 @@
 #include "flash.h"
 #include "main.h"
 
+#ifndef DUMPING
+#define DUMPING 0
+#endif
+
 #ifndef FLASH_TYPEPROGRAM_HALFWORD
 #define FLASH_TYPEPROGRAM_HALFWORD 0 // should fail
 #endif
@@ -43,6 +47,28 @@ uint32_t get_flash_end(void) {
 
 /* Function pointer for jumping to user application. */
 typedef void (*fnc_ptr)(void);
+
+#if DUMPING
+#include "uart.h"
+
+flash_status flash_dump(void)
+{
+  //__IO uint8_t* address = (uint8_t*)FLASH_BASE;
+  uint32_t len = 0x2000;
+  uart_transmit_str("Memery dump:\r\n");
+  /*while(len--) {
+
+  }*/
+  uart_transmit_bytes((uint8_t*)FLASH_BASE, len);
+  return FLASH_OK;
+}
+#else
+flash_status flash_dump(void)
+{
+  return FLASH_OK;
+}
+#endif
+
 
 /**
  * @brief   This function erases the memory.

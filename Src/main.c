@@ -242,6 +242,8 @@ static int8_t boot_code_xmodem(uint32_t rx_pin, uint32_t tx_pin)
 
   uart_init(UART_BAUD, rx_pin, tx_pin, duplex_pin);
 
+  flash_dump();
+
   print_boot_header();
   /* If the button is pressed, then jump to the user application,
    * otherwise stay in the bootloader. */
