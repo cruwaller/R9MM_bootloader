@@ -9,6 +9,7 @@
 
 #include "flash.h"
 #include "main.h"
+#include "uart.h"
 
 #ifndef DUMPING
 #define DUMPING 0
@@ -49,8 +50,6 @@ uint32_t get_flash_end(void) {
 typedef void (*fnc_ptr)(void);
 
 #if DUMPING
-#include "uart.h"
-
 flash_status flash_dump(void)
 {
   //__IO uint8_t* address = (uint8_t*)FLASH_BASE;
@@ -286,6 +285,7 @@ void flash_jump_to_app(void)
   fnc_ptr jump_to_app;
   jump_to_app = (fnc_ptr)(*(volatile uint32_t *)(FLASH_APP_START_ADDRESS + 4u));
   /* Remove configs before jump. */
+  uart_deinit();
   HAL_DeInit();
   /* Change the main stack pointer. */
   asm volatile("msr msp, %0" ::"g"(*(volatile uint32_t *)FLASH_APP_START_ADDRESS));
