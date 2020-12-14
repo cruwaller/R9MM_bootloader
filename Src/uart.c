@@ -12,12 +12,11 @@
 #include "irq.h"
 #include <string.h>
 
-#if defined(STM32L4xx)
-// FIXME: UART ISR causes xmodem failure
+#ifndef USART_USE_RX_ISR
 #define USART_USE_RX_ISR 0
-#else
-#define USART_USE_RX_ISR 1
-#define USART_USE_TX_ISR 1
+#endif
+#ifndef USART_USE_TX_ISR
+#define USART_USE_TX_ISR 0
 #endif
 
 #if defined(STM32F1)
@@ -47,15 +46,19 @@
 
 USART_TypeDef *UART_handle_rx, *UART_handle_tx;
 
-#if USART_USE_RX_ISR
 //#define UART_EIE      USART_CR3_EIE
 #define UART_EIE      0x0
-#define USART_TX_ISR  (UART_EIE | (USART_CR1_TXEIE * USART_USE_TX_ISR))
+#if USART_USE_RX_ISR
 #define USART_RX_ISR  (UART_EIE | USART_CR1_RXNEIE)
 #else
-#define USART_TX_ISR 0
 #define USART_RX_ISR 0
 #endif
+#if USART_USE_TX_ISR
+#define USART_TX_ISR  (UART_EIE | (USART_CR1_TXEIE * USART_USE_TX_ISR))
+#else
+#define USART_TX_ISR 0
+#endif
+
 #define UART_FLAGS (USART_CR1_UE)
 #define UART_TX_FLAGS (USART_CR1_TE | USART_TX_ISR)
 #define UART_RX_FLAGS (USART_CR1_RE | USART_RX_ISR)
@@ -92,8 +95,8 @@ void duplex_state_set(const uint8_t state)
       UART_handle_tx->CR1 = UART_CR_TX;
       break;
     case DUPLEX_RX:
-      if (duplex_pin.reg || !(UART_CR_RX & USART_CR1_TE))
-        while (!LL_USART_IsActiveFlag_TC(UART_handle_tx));
+      //if (duplex_pin.reg || !(UART_CR_RX & USART_CR1_TE))
+      while (!LL_USART_IsActiveFlag_TC(UART_handle_tx));
       UART_handle_tx->CR1 = UART_CR_RX;
       break;
     default:
@@ -222,14 +225,12 @@ uart_status uart_clear(void)
   irqstatus_t irq = irq_save();
   write_u8(&rx_head, 0);
   write_u8(&rx_tail, 0);
-  irq_restore(irq);
-
   LL_USART_ClearFlag_ORE(handle);
 #if !defined(STM32F1)
   LL_USART_ClearFlag_NE(handle);
   LL_USART_ClearFlag_FE(handle);
 #endif
-
+  irq_restore(irq);
   return UART_OK;
 }
 
@@ -331,10 +332,12 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   } else {
     duplex_state_set(DUPLEX_TX);
     while (len--) {
-      LL_USART_TransmitData8(handle, *data++);
       while (!LL_USART_IsActiveFlag_TXE(handle))
         ;
+      LL_USART_TransmitData8(handle, *data++);
     }
+    while (!LL_USART_IsActiveFlag_TXE(handle))
+      ;
     duplex_state_set(DUPLEX_RX);
   }
   return status;
@@ -545,7 +548,7 @@ void uart_init(uint32_t baud, uint32_t pin_rx, uint32_t pin_tx, int32_t duplexpi
       /* RX USART peripheral is not same as TX USART */
       usart_hw_init(uart_ptr_rx, baud, UART_CR_RX, uart_valid_pin_tx(pin_rx));
       /* Set TX to half duplex and always enabled */
-      halfduplex = 1;
+      //halfduplex = 1;
       UART_CR_RX = UART_FLAGS | USART_CR1_TE;
     } else {
       // full duplex
