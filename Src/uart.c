@@ -13,10 +13,10 @@
 #include <string.h>
 
 #ifndef USART_USE_RX_ISR
-#define USART_USE_RX_ISR 0
+#define USART_USE_RX_ISR 1
 #endif
 #ifndef USART_USE_TX_ISR
-#define USART_USE_TX_ISR 0
+#define USART_USE_TX_ISR 1
 #endif
 
 #if defined(STM32F1)
@@ -43,13 +43,8 @@
 #define USART_SR_TC     USART_ISR_TC
 #endif
 
-
-USART_TypeDef *UART_handle_rx, *UART_handle_tx;
-
-//#define UART_EIE      USART_CR3_EIE
-#define UART_EIE      0x0
-#define USART_RX_ISR  (UART_EIE | (USART_CR1_RXNEIE * USART_USE_RX_ISR))
-#define USART_TX_ISR  (UART_EIE | (USART_CR1_TXEIE  * USART_USE_TX_ISR))
+#define USART_RX_ISR  (USART_CR1_RXNEIE * USART_USE_RX_ISR)
+#define USART_TX_ISR  (USART_CR1_TXEIE  * USART_USE_TX_ISR)
 
 #define UART_FLAGS    (USART_CR1_UE)
 #define UART_TX_FLAGS (USART_CR1_TE | USART_TX_ISR)
@@ -60,15 +55,16 @@ USART_TypeDef *UART_handle_rx, *UART_handle_tx;
 
 #define RX_ISR_LST    (USART_SR_RXNE | USART_SR_ORE | USART_SR_FE | USART_SR_NE)
 
+
+static USART_TypeDef *UART_handle_rx, *UART_handle_tx;
 static uint32_t UART_CR_RX, UART_CR_TX;
+static struct gpio_pin duplex_pin;
 
 enum
 {
   DUPLEX_RX,
   DUPLEX_TX,
 };
-
-static struct gpio_pin duplex_pin;
 
 void duplex_setup_pin(int32_t pin)
 {
@@ -115,11 +111,11 @@ void usart_pin_config(uint32_t pin, uint8_t isrx)
 
 // **************************************************
 
-uint8_t rx_head, rx_tail;
-uint8_t rx_buffer[256];
+static uint8_t rx_head, rx_tail;
+static uint8_t rx_buffer[256];
 
-uint8_t tx_head, tx_tail;
-uint8_t tx_buffer[256];
+static uint8_t tx_head, tx_tail;
+static uint8_t tx_buffer[256];
 
 int rx_buffer_available(void)
 {

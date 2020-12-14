@@ -281,6 +281,9 @@ void flash_jump_to_app(void)
     NVIC_SystemReset();
   }
 
+  /* Small delay to allow UART TX send out everything */
+  HAL_Delay(100);
+
   /* Function pointer to the address of the user application. */
   fnc_ptr jump_to_app;
   jump_to_app = (fnc_ptr)(*(volatile uint32_t *)(FLASH_APP_START_ADDRESS + 4u));
