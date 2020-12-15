@@ -16,7 +16,7 @@
 #define USART_USE_RX_ISR 1
 #endif
 #ifndef USART_USE_TX_ISR
-#define USART_USE_TX_ISR 1
+#define USART_USE_TX_ISR 0
 #endif
 
 #if defined(STM32F1)
@@ -161,6 +161,12 @@ int tx_buffer_push(const uint8_t *buff, uint32_t len)
   return len;
 }
 
+void uart_flush(void)
+{
+  while (UART_handle_tx->CR1 & USART_TX_ISR)
+    ;
+}
+
 // ***********************
 
 void USARTx_IRQ_handler(USART_TypeDef * uart)
@@ -209,6 +215,12 @@ void USART3_IRQHandler(void)
 uart_status uart_clear(void)
 {
   USART_TypeDef *handle = UART_handle_rx;
+
+  if (!(UART_CR_RX & USART_CR1_TE)) {
+    // Wait until TX is rdy
+    uart_flush();
+  }
+
   irqstatus_t irq = irq_save();
   write_u8(&rx_head, 0);
   write_u8(&rx_tail, 0);
@@ -313,7 +325,7 @@ uart_status uart_transmit_bytes(uint8_t *data, uint32_t len)
   USART_TypeDef *handle = UART_handle_tx;
   if (!handle)
     return UART_ERROR;
-  if (handle->CR1 & USART_CR1_TXEIE) {
+  if (UART_CR_TX & USART_CR1_TXEIE) {
     if (!tx_buffer_push(data, len))
       status = UART_ERROR;
   } else {
