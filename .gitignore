@@ -8,4 +8,6 @@
 __pycache__
 *.pyc
 *.map
-
+packer.py
+binaries
+dump
