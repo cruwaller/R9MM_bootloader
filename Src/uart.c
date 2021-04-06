@@ -19,6 +19,15 @@
 #define USART_USE_TX_ISR 0
 #endif
 
+#if defined(STM32G0xx)
+#define USART_SR_RXNE       USART_ISR_RXNE_RXFNE
+#define USART_SR_TXE        USART_ISR_TXE_TXFNF
+#define USART_CR1_RXNEIE    USART_CR1_RXNEIE_RXFNEIE
+#define USART_CR1_TXEIE     USART_CR1_TXEIE_TXFNFIE
+#define USART3_IRQn         USART3_4_LPUART1_IRQn
+#endif
+
+
 #if defined(STM32F1)
 #define StatReg         SR
 #else
@@ -97,8 +106,12 @@ void duplex_state_set(const uint8_t state)
 
 void usart_pin_config(uint32_t pin, uint8_t isrx)
 {
-#if defined(STM32L0xx)
+#if defined(STM32L0xx) || defined(STM32G0xx)
+#if defined(STM32G0xx)
+  uint32_t fn = GPIO_FUNCTION(1);
+#else
   uint32_t fn = GPIO_FUNCTION(4);
+#endif
   if (pin == GPIO('B', 6) || pin == GPIO('B', 7)) {
     // USART1 is AF0
     fn = GPIO_FUNCTION(0);
@@ -393,6 +406,8 @@ static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t flags, 
 
 #if defined(STM32F1)
   LL_USART_SetBaudRate(USARTx, pclk, baud);
+#elif defined(STM32G0xx)
+    LL_USART_SetBaudRate(USARTx, pclk, LL_USART_PRESCALER_DIV2, LL_USART_OVERSAMPLING_16, baud);
 #else
   LL_USART_SetBaudRate(USARTx, pclk, LL_USART_OVERSAMPLING_16, baud);
 #endif

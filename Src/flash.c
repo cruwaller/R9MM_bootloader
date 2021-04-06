@@ -80,7 +80,7 @@ flash_status flash_erase(uint32_t address)
   uint32_t error = 0u;
 
   erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
-#if defined(STM32L4xx)
+#if defined(STM32L4xx) || defined(STM32G0xx)
   erase_init.Page = (address - FLASH_BASE) / FLASH_PAGE_SIZE;
 #else
   erase_init.PageAddress = address;
@@ -113,7 +113,7 @@ flash_status flash_erase_page(uint32_t address)
   uint32_t error = 0u;
 
   erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
-#if defined(STM32L4xx)
+#if defined(STM32L4xx) || defined(STM32G0xx)
   erase_init.Page = (address - FLASH_BASE) / FLASH_PAGE_SIZE;
 #else
   erase_init.PageAddress = address;
@@ -141,7 +141,7 @@ flash_status flash_erase_page(uint32_t address)
  * @param   *length: Size of the array.
  * @return  status: Report about the success of the writing.
  */
-#if defined(STM32L4xx)
+#if defined(STM32L4xx) || defined(STM32G0xx)
 flash_status flash_write(uint32_t address, uint32_t *data, uint32_t length) {
   flash_status status = FLASH_OK;
 
