@@ -227,20 +227,33 @@ void led_state_set(uint32_t state)
 
 #if XMODEM
 
-struct bootloader {
-    uint32_t key;
-    uint32_t reset_type;
+enum {
+  BL_FLAG_KEY = 0x626C0000,
+  /* 16bits */
+  BL_FLAG_BAUDRATE = 1,
 };
 
-static int check_bootloader_data(void)
+struct bootloader {
+  uint32_t key;
+  uint32_t reset_type;
+  uint32_t flags;
+  uint32_t baudrate;
+};
+
+static int check_bootloader_data(uint32_t * baudrate)
 {
   /* Fill reset info into RAM for bootloader */
   extern uint32_t _bootloader_data;
   struct bootloader * blinfo = (struct bootloader*)&_bootloader_data;
   if ((0x454c5253 == blinfo->key) && (0xACDC == blinfo->reset_type)) { // ELRS
+    uint32_t flags = blinfo->flags;
     // Clear data
     blinfo->key = 0;
     blinfo->reset_type = 0;
+    if ((flags & BL_FLAG_KEY) == BL_FLAG_KEY) {
+      if (flags & BL_FLAG_BAUDRATE)
+        *baudrate = blinfo->baudrate;
+    }
     return 0; // bootloader requested
   }
   if (flash_check_app_loaded() < 0)
@@ -266,15 +279,16 @@ static void print_boot_header(void)
 
 static int8_t boot_code_xmodem(int32_t rx_pin, int32_t tx_pin)
 {
+  uint32_t baudrate = UART_BAUD;
   uint8_t BLrequested = 0;
   uint8_t header[6] = {0, 0, 0, 0, 0, 0};
 
-  if (check_bootloader_data() < 0) {
+  if (check_bootloader_data(&baudrate) < 0) {
     return -1; // Jump to code immediately
   }
   BLrequested = 1;
 
-  uart_init(UART_BAUD, rx_pin, tx_pin, duplex_pin, UART_INV);
+  uart_init(baudrate, rx_pin, tx_pin, duplex_pin, UART_INV);
   flash_dump();
 
   print_boot_header();
