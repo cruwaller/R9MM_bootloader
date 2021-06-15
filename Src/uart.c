@@ -399,7 +399,8 @@ static void uart_reset(USART_TypeDef * uart_ptr)
 }
 
 static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t flags, uint8_t halfduplex) {
-  uint32_t pclk = SystemCoreClock / 2;
+  //uint32_t pclk = SystemCoreClock / 2;
+  uint32_t pclk = HAL_RCC_GetPCLK1Freq();
 
   /* Reset UART peripheral */
   uart_reset(USARTx);
@@ -407,7 +408,7 @@ static void usart_hw_init(USART_TypeDef *USARTx, uint32_t baud, uint32_t flags, 
 #if defined(STM32F1)
   LL_USART_SetBaudRate(USARTx, pclk, baud);
 #elif defined(STM32G0xx)
-    LL_USART_SetBaudRate(USARTx, pclk, LL_USART_PRESCALER_DIV2, LL_USART_OVERSAMPLING_16, baud);
+  LL_USART_SetBaudRate(USARTx, pclk, LL_USART_PRESCALER_DIV1, LL_USART_OVERSAMPLING_16, baud);
 #else
   LL_USART_SetBaudRate(USARTx, pclk, LL_USART_OVERSAMPLING_16, baud);
 #endif
