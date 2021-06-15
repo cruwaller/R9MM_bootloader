@@ -20,6 +20,8 @@
 #include "stm32f1xx_hal.h"
 #elif defined(STM32F3xx)
 #include "stm32f3xx_hal.h"
+#elif defined(STM32G0xx)
+#include "stm32g0xx_hal.h"
 #endif
 #include <stdint.h>
 

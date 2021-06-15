@@ -47,6 +47,11 @@
 #include "stm32l4xx_hal.h"
 #include "stm32l4xx_ll_gpio.h"
 #include "stm32l4xx_ll_usart.h"
+#elif defined(STM32G0xx)
+#include "stm32g0xx.h"
+#include "stm32g0xx_hal.h"
+#include "stm32g0xx_ll_gpio.h"
+#include "stm32g0xx_ll_usart.h"
 #else
 #error "Not supported CPU type!"
 #endif
